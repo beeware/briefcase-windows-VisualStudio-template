@@ -149,7 +149,7 @@ int Main(array<String^>^ args) {
     // Set the full module path. This includes the stdlib, site-packages, and app code.
     std::wcout << "PYTHONPATH:" << std::endl;
     // The .zip form of the stdlib
-    path = python_home + "\\python311.zip";
+    path = python_home + "\\python38.zip";
     std::wcout << "- " << wstr(path) << std::endl;
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
