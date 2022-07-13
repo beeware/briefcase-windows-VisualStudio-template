@@ -5,16 +5,19 @@
 
 #include "CrashDialog.h"
 
+#include <fcntl.h>
+#include <windows.h>
+
 using namespace System;
 using namespace System::Diagnostics;
 using namespace System::IO;
 using namespace System::Windows::Forms;
 
+
 wchar_t* wstr(String^);
 void crash_dialog(String^);
 String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback);
 
-//[STAThreadAttribute]
 int Main(array<String^>^ args) {
     int ret = 0;
     FileVersionInfo^ version_info;
@@ -41,45 +44,50 @@ int Main(array<String^>^ args) {
     // Get details of the app from app metadata
     version_info = FileVersionInfo::GetVersionInfo(Application::ExecutablePath);
 
-    // Redirect stdout to a log file in the user's local AppData.
-    log_folder = Environment::GetFolderPath(Environment::SpecialFolder::LocalApplicationData) + "\\" +
-        version_info->CompanyName + "\\" +
-        version_info->ProductName + "\\Logs";
-    if (!Directory::Exists(log_folder)) {
-        // If log folder doesn't exist, create it
-        Directory::CreateDirectory(log_folder);
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        freopen_s(&log, "CONOUT$", "w", stdout);
+        freopen_s(&log, "CONOUT$", "w", stderr);
     } else {
-        // If it does, rotate the logs in that folder.
-        // - Delete <app name>-9.log
-        src_log = log_folder + "\\" + version_info->InternalName + "-9.log";
-        if (File::Exists(src_log)) {
-            File::Delete(src_log);
-        }
-
-        // - Move <app name>-8.log -> <app name>-9.log
-        // - Move <app name>-7.log -> <app name>-8.log
-        // - ...
-        // - Move <app name>.log -> <app name>-2.log
-        for (int dst_index = 9; dst_index >= 2; dst_index--) {
-            if (dst_index == 2) {
-                src_log = log_folder + "\\" + version_info->InternalName + ".log";
-            } else {
-                src_log = log_folder + "\\" + version_info->InternalName + "-" + (dst_index - 1) + ".log";
-            }
-            dst_log = log_folder + "\\" + version_info->InternalName + "-" + dst_index + ".log";
-
+        log_folder = Environment::GetFolderPath(Environment::SpecialFolder::LocalApplicationData) + "\\" +
+            version_info->CompanyName + "\\" +
+            version_info->ProductName + "\\Logs";
+        if (!Directory::Exists(log_folder)) {
+            // If log folder doesn't exist, create it
+            Directory::CreateDirectory(log_folder);
+        } else {
+            // If it does, rotate the logs in that folder.
+            // - Delete <app name>-9.log
+            src_log = log_folder + "\\" + version_info->InternalName + "-9.log";
             if (File::Exists(src_log)) {
-                File::Move(src_log, dst_log);
+                File::Delete(src_log);
+            }
+
+            // - Move <app name>-8.log -> <app name>-9.log
+            // - Move <app name>-7.log -> <app name>-8.log
+            // - ...
+            // - Move <app name>.log -> <app name>-2.log
+            for (int dst_index = 9; dst_index >= 2; dst_index--) {
+                if (dst_index == 2) {
+                    src_log = log_folder + "\\" + version_info->InternalName + ".log";
+                } else {
+                    src_log = log_folder + "\\" + version_info->InternalName + "-" + (dst_index - 1) + ".log";
+                }
+                dst_log = log_folder + "\\" + version_info->InternalName + "-" + dst_index + ".log";
+
+                if (File::Exists(src_log)) {
+                    File::Move(src_log, dst_log);
+                }
             }
         }
+
+        // Redirect stdout to a log file <app name>.log, in the
+        // user's local Logs folder for the app.
+        // stderr doesn't exist when running without an attached console;
+        // sys.stderr will be None in the Python interpreter. This causes
+        // all error output to be written to stdout.
+        _wfreopen_s(&log, wstr(log_folder + "\\" + version_info->InternalName + ".log"), L"w", stdout);
     }
 
-    // Redirect stdout to a log file <app name>.log, in the
-    // user's local Logs folder for the app.
-    // stderr doesn't exist when running without an attached console;
-    // sys.stderr will be None in the Python interpreter. This causes
-    // all error output to be written to stdout.
-    _wfreopen_s(&log, wstr(log_folder + "\\" + version_info->InternalName + ".log"), L"w", stdout);
     std::wcout << "Log started: " << wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")) << std::endl;
 
     // Preconfigure the Python interpreter;
@@ -93,7 +101,6 @@ int Main(array<String^>^ args) {
     status = Py_PreInitialize(&pre_config);
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to pre-initialize Python runtime.");
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -119,7 +126,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set PYTHONHOME: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -129,7 +135,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -138,7 +143,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to read site config: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -151,7 +155,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set .zip form of stdlib path: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -162,7 +165,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set unpacked form of stdlib path: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -173,7 +175,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set app packages path: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -184,7 +185,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set app path: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -197,7 +197,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -206,7 +205,6 @@ int Main(array<String^>^ args) {
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to initialize Python interpreter: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
-        fclose(log);
         Py_ExitStatusException(status);
     }
 
@@ -227,32 +225,28 @@ int Main(array<String^>^ args) {
         module = PyImport_ImportModule("runpy");
         if (module == NULL) {
             crash_dialog("Could not import runpy module");
-            fclose(log);
             exit(-2);
         }
 
         module_attr = PyObject_GetAttrString(module, "_run_module_as_main");
         if (module_attr == NULL) {
             crash_dialog("Could not access runpy._run_module_as_main");
-            fclose(log);
             exit(-3);
         }
 
         app_module = PyUnicode_FromWideChar(wstr(app_module_name), app_module_name->Length);
         if (app_module == NULL) {
             crash_dialog("Could not convert module name to unicode");
-            fclose(log);
             exit(-3);
         }
 
         method_args = Py_BuildValue("(Oi)", app_module, 0);
         if (method_args == NULL) {
             crash_dialog("Could not create arguments for runpy._run_module_as_main");
-            fclose(log);
             exit(-4);
         }
 
-        std::wcout << "===========================================================================" << std::endl;
+        std::wcout << "---------------------------------------------------------------------------" << std::endl;
         result = PyObject_Call(module_attr, method_args, NULL);
 
         if (result == NULL) {
@@ -262,7 +256,6 @@ int Main(array<String^>^ args) {
 
             if (exc_traceback == NULL) {
                 crash_dialog("Could not retrieve traceback");
-                fclose(log);
                 exit(-5);
             }
 
@@ -284,7 +277,7 @@ int Main(array<String^>^ args) {
                 traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
                 crash_dialog(traceback_str);
 
-                std::wcout << "===========================================================================" << std::endl;
+                std::wcout << "---------------------------------------------------------------------------" << std::endl;
                 std::wcout << "Application quit abnormally (Exit code " << ret << ")!" << std::endl;
 
                 // Restore the error state of the interpreter.
@@ -302,7 +295,6 @@ int Main(array<String^>^ args) {
         crash_dialog("Python runtime error: " + exception);
         ret = -7;
     }
-    fclose(log);
     Py_Finalize();
 
     return ret;
