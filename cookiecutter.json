@@ -9,5 +9,5 @@
     "description": "Short description of app",
     "guid": "1409c8f5-c276-4cf3-a2fd-defcbdfef9a2",
     "install_scope": "",
-    "_use_arch64": ""
+    "python_version": "3.10.0"
 }
