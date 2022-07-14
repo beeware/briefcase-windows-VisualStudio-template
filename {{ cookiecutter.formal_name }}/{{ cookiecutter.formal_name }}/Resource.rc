@@ -78,11 +78,11 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "{{ cookiecutter.author }}"
-            VALUE "FileDescription", "{{ cookiecutter.description }}"
+            VALUE "FileDescription", "{{ cookiecutter.formal_name }}"
             VALUE "FileVersion", "{{ cookiecutter.version_triple }}"
             VALUE "InternalName", "{{ cookiecutter.module_name }}"
             VALUE "LegalCopyright", "Copyright (C) 2022"
-            VALUE "OriginalFilename", "{{ cookiecutter.app_name[:8] }}.exe"
+            VALUE "OriginalFilename", "{{ cookiecutter.formal_name }}.exe"
             VALUE "ProductName", "{{ cookiecutter.formal_name }}"
             VALUE "ProductVersion", "{{ cookiecutter.version_triple }}"
         END
