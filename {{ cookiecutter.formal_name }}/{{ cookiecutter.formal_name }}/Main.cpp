@@ -25,8 +25,6 @@ int Main(array<String^>^ args) {
     String^ src_log;
     String^ dst_log;
     FILE* log;
-    PyStatus status;
-    PyConfig config;
     String^ python_home;
     String^ app_module_name;
     String^ path;
@@ -90,123 +88,40 @@ int Main(array<String^>^ args) {
 
     std::wcout << "Log started: " << wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")) << std::endl;
 
-    // Preconfigure the Python interpreter;
-    // This ensures the interpreter is in Isolated mode,
-    // and is using UTF-8 encoding.
-    std::wcout << "PreInitializing Python runtime..." << std::endl;
-    PyPreConfig pre_config;
-    PyPreConfig_InitPythonConfig(&pre_config);
-    pre_config.utf8_mode = 1;
-    pre_config.isolated = 1;
-    status = Py_PreInitialize(&pre_config);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to pre-initialize Python runtime.");
-        Py_ExitStatusException(status);
-    }
-
-    // Pre-initialize Python configuration
-    PyConfig_InitIsolatedConfig(&config);
-
-    // Configure the Python interpreter:
-    // Run at optimization level 1
-    // (remove assertions, set __debug__ to False)
-    config.optimization_level = 1;
-    // Don't buffer stdio. We want output to appears in the log immediately
-    config.buffered_stdio = 0;
-    // Don't write bytecode; we can't modify the app bundle
-    // after it has been signed.
-    config.write_bytecode = 0;
-    // Isolated apps need to set the full PYTHONPATH manually.
-    config.module_search_paths_set = 1;
+    // Special environment to prefer .pyo; also, don't write bytecode
+    // because the process will not have write permissions on the device.
+    _putenv("PYTHONOPTIMIZE=1");
+    _putenv("PYTHONDONTWRITEBYTECODE=1");
+    _putenv("PYTHONUNBUFFERED=1");
 
     // Set the home for the Python interpreter
     python_home = Application::StartupPath + "\\python";
     std::wcout << "PythonHome: " << wstr(python_home) << std::endl;
-    status = PyConfig_SetString(&config, &config.home, wstr(python_home));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set PYTHONHOME: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
+    Py_SetPythonHome(wstr(python_home));
 
     // Determine the app module name
     app_module_name = version_info->InternalName;
-    status = PyConfig_SetString(&config, &config.run_module, wstr(app_module_name));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Read the site config
-    status = PyConfig_Read(&config);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to read site config: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
+    Py_SetProgramName(wstr(app_module_name));
 
     // Set the full module path. This includes the stdlib, site-packages, and app code.
-    std::wcout << "PYTHONPATH:" << std::endl;
-    // The .zip form of the stdlib
-    path = python_home + "\\python37.zip";
-    std::wcout << "- " << wstr(path) << std::endl;
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set .zip form of stdlib path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
+    path = python_home + "\\python37.zip;" +
+        python_home + ";" +
+        System::Windows::Forms::Application::StartupPath + "\\app_packages;" +
+        System::Windows::Forms::Application::StartupPath + "\\app";
 
-    // The unpacked form of the stdlib
-    path = python_home;
-    std::wcout << "- " << wstr(path) << std::endl;
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set unpacked form of stdlib path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
+    std::wcout << "PYTHONPATH: " << wstr(path) << std::endl;
+    Py_SetPath(wstr(path));
 
-    // Add the app_packages path
-    path = System::Windows::Forms::Application::StartupPath + "\\app_packages";
-    std::wcout << "- " << wstr(path) << std::endl;
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app packages path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Add the app path
-    path = System::Windows::Forms::Application::StartupPath + "\\app";
-    std::wcout << "- " << wstr(path) << std::endl;
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
+    std::wcout << "Initializing Python runtime..." << std::endl;
+    Py_Initialize();
 
     std::wcout << "Configure argc/argv..." << std::endl;
     wchar_t** argv = new wchar_t* [args->Length];
+    argv[0] = wstr(app_module_name);
     for (int i = 0; i < args->Length; i++) {
         argv[i] = wstr(args[i]);
     }
-    status = PyConfig_SetArgv(&config, args->Length, argv);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    std::wcout << "Initializing Python runtime..." << std::endl;
-    status = Py_InitializeFromConfig(&config);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to initialize Python interpreter: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
+    PySys_SetArgv(args->Length, argv);
 
     // Initializing Python modifies stdout to be a UTF-8 stream.
     // Make sure std::wcout is configured the same.
