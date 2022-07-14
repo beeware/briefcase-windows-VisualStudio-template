@@ -115,6 +115,10 @@ int Main(array<String^>^ args) {
     std::wcout << "Initializing Python runtime..." << std::endl;
     Py_Initialize();
 
+    // Initializing Python modifies stdout to be a UTF-8 stream.
+    // Make sure std::wcout is configured the same.
+    std::wcout.imbue(std::locale(".UTF8"));
+
     std::wcout << "Configure argc/argv..." << std::endl;
     wchar_t** argv = new wchar_t* [args->Length];
     argv[0] = wstr(app_module_name);
@@ -122,10 +126,6 @@ int Main(array<String^>^ args) {
         argv[i] = wstr(args[i]);
     }
     PySys_SetArgv(args->Length, argv);
-
-    // Initializing Python modifies stdout to be a UTF-8 stream.
-    // Make sure std::wcout is configured the same.
-    std::wcout.imbue(std::locale(".UTF8"));
 
     try {
         // Start the app module.
