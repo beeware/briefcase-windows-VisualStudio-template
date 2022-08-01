@@ -1,5 +1,5 @@
 [paths]
 app_path = "x64/Release/app"
 app_packages_path = "x64/Release/app_packages"
-support_path = "x64/Release/python"
+support_path = "x64/Release"
 icon = "{{ cookiecutter.formal_name }}/icon.ico"

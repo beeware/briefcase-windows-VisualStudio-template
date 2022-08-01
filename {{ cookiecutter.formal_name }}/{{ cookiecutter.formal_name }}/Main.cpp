@@ -120,7 +120,7 @@ int Main(array<String^>^ args) {
     config.module_search_paths_set = 1;
 
     // Set the home for the Python interpreter
-    python_home = Application::StartupPath + "\\python";
+    python_home = Application::StartupPath;
     std::wcout << "PythonHome: " << wstr(python_home) << std::endl;
     status = PyConfig_SetString(&config, &config.home, wstr(python_home));
     if (PyStatus_Exception(status)) {
