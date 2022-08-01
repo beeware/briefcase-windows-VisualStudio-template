@@ -95,7 +95,7 @@ int Main(array<String^>^ args) {
     _putenv("PYTHONUNBUFFERED=1");
 
     // Set the home for the Python interpreter
-    python_home = Application::StartupPath + "\\python";
+    python_home = Application::StartupPath;
     std::wcout << "PythonHome: " << wstr(python_home) << std::endl;
     Py_SetPythonHome(wstr(python_home));
 
