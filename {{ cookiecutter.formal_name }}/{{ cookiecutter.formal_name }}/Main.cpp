@@ -1,4 +1,3 @@
-#include <iostream>
 #include <vcclr.h>
 
 #include <Python.h>
@@ -88,12 +87,11 @@ int Main(array<String^>^ args) {
         _wfreopen_s(&log, wstr(log_folder + "\\" + version_info->InternalName + ".log"), L"w", stdout);
     }
 
-    std::wcout << "Log started: " << wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")) << std::endl;
-
+    printf("Log started: %S\n", wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")));
     // Preconfigure the Python interpreter;
     // This ensures the interpreter is in Isolated mode,
     // and is using UTF-8 encoding.
-    std::wcout << "PreInitializing Python runtime..." << std::endl;
+    printf("PreInitializing Python runtime...\n");
     PyPreConfig pre_config;
     PyPreConfig_InitPythonConfig(&pre_config);
     pre_config.utf8_mode = 1;
@@ -121,7 +119,7 @@ int Main(array<String^>^ args) {
 
     // Set the home for the Python interpreter
     python_home = Application::StartupPath;
-    std::wcout << "PythonHome: " << wstr(python_home) << std::endl;
+    printf("PythonHome: %S\n", wstr(python_home));
     status = PyConfig_SetString(&config, &config.home, wstr(python_home));
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set PYTHONHOME: " + gcnew String(status.err_msg));
@@ -147,10 +145,10 @@ int Main(array<String^>^ args) {
     }
 
     // Set the full module path. This includes the stdlib, site-packages, and app code.
-    std::wcout << "PYTHONPATH:" << std::endl;
+    printf("PYTHONPATH:\n");
     // The .zip form of the stdlib
     path = python_home + "\\python310.zip";
-    std::wcout << "- " << wstr(path) << std::endl;
+    printf("- %S\n", wstr(path));
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set .zip form of stdlib path: " + gcnew String(status.err_msg));
@@ -160,7 +158,7 @@ int Main(array<String^>^ args) {
 
     // The unpacked form of the stdlib
     path = python_home;
-    std::wcout << "- " << wstr(path) << std::endl;
+    printf("- %S\n", wstr(path));
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set unpacked form of stdlib path: " + gcnew String(status.err_msg));
@@ -170,7 +168,7 @@ int Main(array<String^>^ args) {
 
     // Add the app_packages path
     path = System::Windows::Forms::Application::StartupPath + "\\app_packages";
-    std::wcout << "- " << wstr(path) << std::endl;
+    printf("- %S\n", wstr(path));
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set app packages path: " + gcnew String(status.err_msg));
@@ -180,7 +178,7 @@ int Main(array<String^>^ args) {
 
     // Add the app path
     path = System::Windows::Forms::Application::StartupPath + "\\app";
-    std::wcout << "- " << wstr(path) << std::endl;
+    printf("- %S\n", wstr(path));
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set app path: " + gcnew String(status.err_msg));
@@ -188,7 +186,7 @@ int Main(array<String^>^ args) {
         Py_ExitStatusException(status);
     }
 
-    std::wcout << "Configure argc/argv..." << std::endl;
+    printf("Configure argc/argv...\n");
     wchar_t** argv = new wchar_t* [args->Length];
     for (int i = 0; i < args->Length; i++) {
         argv[i] = wstr(args[i]);
@@ -200,7 +198,7 @@ int Main(array<String^>^ args) {
         Py_ExitStatusException(status);
     }
 
-    std::wcout << "Initializing Python runtime..." << std::endl;
+    printf("Initializing Python runtime...\n");
     status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to initialize Python interpreter: " + gcnew String(status.err_msg));
@@ -210,7 +208,7 @@ int Main(array<String^>^ args) {
 
     // Initializing Python modifies stdout to be a UTF-8 stream.
     // Make sure std::wcout is configured the same.
-    std::wcout.imbue(std::locale(".UTF8"));
+    //std::wcout.imbue(std::locale(".UTF8"));
 
     try {
         // Start the app module.
@@ -220,7 +218,7 @@ int Main(array<String^>^ args) {
         // pymain_run_module() method); we need to re-implement it
         // because we need to be able to inspect the error state of
         // the interpreter, not just the return code of the module.
-        std::wcout << "Running app module: " << wstr(app_module_name) << std::endl;
+        printf("Running app module: %S\n", wstr(app_module_name));
 
         module = PyImport_ImportModule("runpy");
         if (module == NULL) {
@@ -246,7 +244,7 @@ int Main(array<String^>^ args) {
             exit(-4);
         }
 
-        std::wcout << "---------------------------------------------------------------------------" << std::endl;
+        printf("---------------------------------------------------------------------------\n");
         result = PyObject_Call(module_attr, method_args, NULL);
 
         if (result == NULL) {
@@ -262,7 +260,7 @@ int Main(array<String^>^ args) {
             if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
                 systemExit_code = PyObject_GetAttrString(exc_value, "code");
                 if (systemExit_code == NULL) {
-                    std::wcout << "Could not determine exit code" << std::endl;
+                    printf("Could not determine exit code\n");
                     ret = -10;
                 }
                 else {
@@ -277,8 +275,8 @@ int Main(array<String^>^ args) {
                 traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
                 crash_dialog(traceback_str);
 
-                std::wcout << "---------------------------------------------------------------------------" << std::endl;
-                std::wcout << "Application quit abnormally (Exit code " << ret << ")!" << std::endl;
+                printf("---------------------------------------------------------------------------\n");
+                printf("Application quit abnormally (Exit code %d)!\n", ret);
 
                 // Restore the error state of the interpreter.
                 PyErr_Restore(exc_type, exc_value, exc_traceback);
@@ -312,7 +310,7 @@ wchar_t *wstr(String^ str)
  */
 void crash_dialog(System::String^ details) {
     // Write the error to the log
-    std::wcout << wstr(details);
+    printf("%S\n", wstr(details));
 
     Briefcase::CrashDialog^ form;
 
@@ -347,7 +345,7 @@ String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback) {
     // Format the traceback.
     traceback_module = PyImport_ImportModule("traceback");
     if (traceback_module == NULL) {
-        std::wcout << "Could not import traceback" << std::endl;
+        printf("Could not import traceback.\n");
         return "Could not import traceback";
     }
 
@@ -355,12 +353,12 @@ String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback) {
     if (format_exception && PyCallable_Check(format_exception)) {
         traceback_list = PyObject_CallFunctionObjArgs(format_exception, type, value, traceback, NULL);
     } else {
-        std::wcout << "Could not find 'format_exception' in 'traceback' module" << std::endl;
-        return "Could not find 'format_exception' in 'traceback' module";
+        printf("Could not find 'format_exception' in 'traceback' module.\n");
+        return "Could not find 'format_exception' in 'traceback' module.";
     }
     if (traceback_list == NULL) {
-        std::wcout << "Could not format traceback" << std::endl;
-        return "Could not format traceback";
+        printf("Could not format traceback.\n");
+        return "Could not format traceback.";
     }
 
     // Concatenate all the lines of the traceback into a single string
