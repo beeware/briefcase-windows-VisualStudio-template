@@ -147,7 +147,7 @@ int Main(array<String^>^ args) {
     // Set the full module path. This includes the stdlib, site-packages, and app code.
     printf("PYTHONPATH:\n");
     // The .zip form of the stdlib
-    path = python_home + "\\python311.zip";
+    path = python_home + "\\python{{ cookiecutter.python_version|py_libtag }}.zip";
     printf("- %S\n", wstr(path));
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
