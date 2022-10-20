@@ -1,0 +1,12 @@
+[tool.briefcase]
+project_name = "Hello PySide6"
+bundle = "org.beeware"
+version = "0.0.1"
+url = "https://beeware.org/"
+license = "BSD license"
+author = 'Brutus'
+author_email = "contact@beeware.org"
+
+[tool.briefcase.app.verify-pyside6.windows]
+requires = []
+template = '../../../'
