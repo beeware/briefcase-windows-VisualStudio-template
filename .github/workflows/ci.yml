@@ -50,6 +50,7 @@ jobs:
         run: |
           cd tests/apps/verify-${{ matrix.framework }}
           briefcase create ${{ matrix.os_name }} VisualStudio
+          type "tests\apps\verify-pyside2\windows\VisualStudio\Hello PySide2\Hello PySide2.sln"
           briefcase build ${{ matrix.os_name }} VisualStudio
           briefcase package ${{ matrix.os_name }} VisualStudio --adhoc-sign
       - uses: actions/upload-artifact@v3
