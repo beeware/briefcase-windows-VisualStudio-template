@@ -280,9 +280,6 @@ int Main(array<String^>^ args) {
             if (ret != 0) {
                 // Display stack trace in the crash dialog.
                 traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
-                crash_dialog(traceback_str);
-
-                printf("---------------------------------------------------------------------------\n");
                 printf("Application quit abnormally (Exit code %d)!\n", ret);
 
                 // Restore the error state of the interpreter.
@@ -292,6 +289,8 @@ int Main(array<String^>^ args) {
                 // In case of SystemExit, this will call exit()
                 PyErr_Print();
 
+                // Display stack trace in the crash dialog.
+                crash_dialog(traceback_str);
                 exit(ret);
             }
         }
