@@ -44,10 +44,10 @@ int Main(array<String^>^ args) {
     // Get details of the app from app metadata
     version_info = FileVersionInfo::GetVersionInfo(Application::ExecutablePath);
 
-    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
-        freopen_s(&log, "CONOUT$", "w", stdout);
-        freopen_s(&log, "CONOUT$", "w", stderr);
-    } else {
+    // If we can attach to the console, then we're running in a terminal;
+    // we can use stdout and stderr as normal. However, if there's no
+    // console, we need to redirect stdout/err to a log file.
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
         log_folder = Environment::GetFolderPath(Environment::SpecialFolder::LocalApplicationData) + "\\" +
             version_info->CompanyName + "\\" +
             version_info->ProductName + "\\Logs";
@@ -251,7 +251,13 @@ int Main(array<String^>^ args) {
             exit(-4);
         }
 
+        // Print a separator to differentiate Python startup logs from app logs,
+        // then flush stdout/stderr to ensure all startup logs have been output.
         printf("---------------------------------------------------------------------------\n");
+        fflush(stdout);
+        fflush(stderr);
+
+        // Invoke the app module
         result = PyObject_Call(module_attr, method_args, NULL);
 
         if (result == NULL) {
