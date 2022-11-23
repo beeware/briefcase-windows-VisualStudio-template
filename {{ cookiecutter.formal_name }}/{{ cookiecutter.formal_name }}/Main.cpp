@@ -30,6 +30,7 @@ int Main(array<String^>^ args) {
     String^ app_module_name;
     String^ path;
     String^ traceback_str;
+    wchar_t *app_module_str;
     PyObject *app_module;
     PyObject *module;
     PyObject *module_attr;
@@ -43,10 +44,10 @@ int Main(array<String^>^ args) {
     // Get details of the app from app metadata
     version_info = FileVersionInfo::GetVersionInfo(Application::ExecutablePath);
 
-    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
-        freopen_s(&log, "CONOUT$", "w", stdout);
-        freopen_s(&log, "CONOUT$", "w", stderr);
-    } else {
+    // If we can attach to the console, then we're running in a terminal;
+    // we can use stdout and stderr as normal. However, if there's no
+    // console, we need to redirect stdout/err to a log file.
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
         log_folder = Environment::GetFolderPath(Environment::SpecialFolder::LocalApplicationData) + "\\" +
             version_info->CompanyName + "\\" +
             version_info->ProductName + "\\Logs";
@@ -106,9 +107,6 @@ int Main(array<String^>^ args) {
     PyConfig_InitIsolatedConfig(&config);
 
     // Configure the Python interpreter:
-    // Run at optimization level 1
-    // (remove assertions, set __debug__ to False)
-    config.optimization_level = 1;
     // Don't buffer stdio. We want output to appears in the log immediately
     config.buffered_stdio = 0;
     // Don't write bytecode; we can't modify the app bundle
@@ -127,9 +125,18 @@ int Main(array<String^>^ args) {
         Py_ExitStatusException(status);
     }
 
-    // Determine the app module name
-    app_module_name = version_info->InternalName;
-    status = PyConfig_SetString(&config, &config.run_module, wstr(app_module_name));
+    // Determine the app module name. Look for the BRIEFCASE_MAIN_MODULE
+    // environment variable first; if that exists, we're probably in test
+    // mode. If it doesn't exist, fall back to the MainModule key in the
+    // main bundle.
+    app_module_str = _wgetenv(L"BRIEFCASE_MAIN_MODULE");
+    if (app_module_str) {
+        app_module_name = gcnew String(app_module_str);
+    } else {
+        app_module_name = version_info->InternalName;
+        app_module_str = wstr(app_module_name);
+    }
+    status = PyConfig_SetString(&config, &config.run_module, app_module_str);
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
@@ -218,7 +225,7 @@ int Main(array<String^>^ args) {
         // pymain_run_module() method); we need to re-implement it
         // because we need to be able to inspect the error state of
         // the interpreter, not just the return code of the module.
-        printf("Running app module: %S\n", wstr(app_module_name));
+        printf("Running app module: %S\n", app_module_str);
 
         module = PyImport_ImportModule("runpy");
         if (module == NULL) {
@@ -232,7 +239,7 @@ int Main(array<String^>^ args) {
             exit(-3);
         }
 
-        app_module = PyUnicode_FromWideChar(wstr(app_module_name), app_module_name->Length);
+        app_module = PyUnicode_FromWideChar(app_module_str, wcslen(app_module_str));
         if (app_module == NULL) {
             crash_dialog("Could not convert module name to unicode");
             exit(-3);
@@ -244,7 +251,13 @@ int Main(array<String^>^ args) {
             exit(-4);
         }
 
+        // Print a separator to differentiate Python startup logs from app logs,
+        // then flush stdout/stderr to ensure all startup logs have been output.
         printf("---------------------------------------------------------------------------\n");
+        fflush(stdout);
+        fflush(stderr);
+
+        // Invoke the app module
         result = PyObject_Call(module_attr, method_args, NULL);
 
         if (result == NULL) {
@@ -273,9 +286,6 @@ int Main(array<String^>^ args) {
             if (ret != 0) {
                 // Display stack trace in the crash dialog.
                 traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
-                crash_dialog(traceback_str);
-
-                printf("---------------------------------------------------------------------------\n");
                 printf("Application quit abnormally (Exit code %d)!\n", ret);
 
                 // Restore the error state of the interpreter.
@@ -285,6 +295,8 @@ int Main(array<String^>^ args) {
                 // In case of SystemExit, this will call exit()
                 PyErr_Print();
 
+                // Display stack trace in the crash dialog.
+                crash_dialog(traceback_str);
                 exit(ret);
             }
         }
@@ -312,6 +324,10 @@ void crash_dialog(System::String^ details) {
     // Write the error to the log
     printf("%S\n", wstr(details));
 
+    // If there's an app module override, we're running in test mode; don't show error dialogs
+    if (getenv("BRIEFCASE_MAIN_MODULE")) {
+        return;
+    }
     Briefcase::CrashDialog^ form;
 
     form = gcnew Briefcase::CrashDialog(details);
