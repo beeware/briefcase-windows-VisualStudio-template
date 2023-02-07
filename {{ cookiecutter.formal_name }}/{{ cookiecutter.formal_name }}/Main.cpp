@@ -194,11 +194,12 @@ int Main(array<String^>^ args) {
     }
 
     printf("Configure argc/argv...\n");
-    wchar_t** argv = new wchar_t* [args->Length];
+    wchar_t** argv = new wchar_t* [args->Length + 1];
+    argv[0] = wstr(Application::ExecutablePath);
     for (int i = 0; i < args->Length; i++) {
-        argv[i] = wstr(args[i]);
+        argv[i + 1] = wstr(args[i]);
     }
-    status = PyConfig_SetArgv(&config, args->Length, argv);
+    status = PyConfig_SetArgv(&config, args->Length + 1, argv);
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
