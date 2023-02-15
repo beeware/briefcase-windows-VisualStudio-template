@@ -19,6 +19,7 @@ String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback);
 
 int Main(array<String^>^ args) {
     int ret = 0;
+    size_t size;
     FileVersionInfo^ version_info;
     String^ log_folder;
     String^ src_log;
@@ -40,6 +41,10 @@ int Main(array<String^>^ args) {
     PyObject *exc_value;
     PyObject *exc_traceback;
     PyObject *systemExit_code;
+
+    // Uninitialize the Windows threading model; allow apps to make
+    // their own threading model decisions.
+    CoUninitialize();
 
     // Get details of the app from app metadata
     version_info = FileVersionInfo::GetVersionInfo(Application::ExecutablePath);
@@ -129,7 +134,7 @@ int Main(array<String^>^ args) {
     // environment variable first; if that exists, we're probably in test
     // mode. If it doesn't exist, fall back to the MainModule key in the
     // main bundle.
-    app_module_str = _wgetenv(L"BRIEFCASE_MAIN_MODULE");
+    _wdupenv_s(&app_module_str, &size, L"BRIEFCASE_MAIN_MODULE");
     if (app_module_str) {
         app_module_name = gcnew String(app_module_str);
     } else {
@@ -213,10 +218,6 @@ int Main(array<String^>^ args) {
         PyConfig_Clear(&config);
         Py_ExitStatusException(status);
     }
-
-    // Initializing Python modifies stdout to be a UTF-8 stream.
-    // Make sure std::wcout is configured the same.
-    //std::wcout.imbue(std::locale(".UTF8"));
 
     try {
         // Start the app module.
@@ -322,11 +323,14 @@ wchar_t *wstr(String^ str)
  * details of an error during application execution (usually a traceback).
  */
 void crash_dialog(System::String^ details) {
+    wchar_t *app_module_str;
+    size_t size;
     // Write the error to the log
     printf("%S\n", wstr(details));
 
     // If there's an app module override, we're running in test mode; don't show error dialogs
-    if (getenv("BRIEFCASE_MAIN_MODULE")) {
+    _wdupenv_s(&app_module_str, &size, L"BRIEFCASE_MAIN_MODULE");
+    if (app_module_str) {
         return;
     }
     Briefcase::CrashDialog^ form;

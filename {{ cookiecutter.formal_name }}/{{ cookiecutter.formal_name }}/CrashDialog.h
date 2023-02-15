@@ -23,7 +23,7 @@ namespace Briefcase {
 			this->Width = 540;
 			this->Height = 320;
 			this->Text = "Application has crashed";
-			this->Icon = this->Icon->ExtractAssociatedIcon(Application::ExecutablePath);
+			this->Icon = System::Drawing::Icon::ExtractAssociatedIcon(Application::ExecutablePath);
 
 			// The top-of-page introductory message
 			System::Windows::Forms::Label^ label = gcnew System::Windows::Forms::Label();
