@@ -47,3 +47,6 @@ jobs:
           - python-version: 3.12
             python-source: github
             framework: pygame
+          - python-version: 3.12
+            python-source: winstore
+            framework: pygame
