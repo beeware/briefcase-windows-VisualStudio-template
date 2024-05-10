@@ -54,7 +54,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>Ole32.lib</AdditionalDependencies>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>{% if cookiecutter.console_app %}Console{% else %}Windows{% endif %}</SubSystem>
       <EntryPointSymbol>Main</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
@@ -65,7 +65,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>Ole32.lib</AdditionalDependencies>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>{% if cookiecutter.console_app %}Console{% else %}Windows{% endif %}</SubSystem>
       <EntryPointSymbol>Main</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
@@ -77,13 +77,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CrashDialog.cpp" />
+{% if not cookiecutter.console_app %}    <ClCompile Include="CrashDialog.cpp" />{% endif %}
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CrashDialog.h">
+{% if not cookiecutter.console_app %}    <ClInclude Include="CrashDialog.h">
       <FileType>CppForm</FileType>
-    </ClInclude>
+    </ClInclude>{% endif %}
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>

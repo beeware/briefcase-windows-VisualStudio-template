@@ -2,8 +2,10 @@
 
 #include <Python.h>
 
+{% if cookiecutter.console_app %}
+{% else %}
 #include "CrashDialog.h"
-
+{% endif %}
 #include <fcntl.h>
 #include <windows.h>
 
@@ -13,7 +15,14 @@ using namespace System::IO;
 using namespace System::Windows::Forms;
 
 
+// A global indicator of the debug level
+char *debug_mode;
+
+#define info_log(...) printf(__VA_ARGS__)
+#define debug_log(...) if (debug_mode) printf(__VA_ARGS__)
+
 wchar_t* wstr(String^);
+void setup_stdout(FileVersionInfo^);
 void crash_dialog(String^);
 String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback);
 
@@ -21,10 +30,6 @@ int Main(array<String^>^ args) {
     int ret = 0;
     size_t size;
     FileVersionInfo^ version_info;
-    String^ log_folder;
-    String^ src_log;
-    String^ dst_log;
-    FILE* log;
     PyStatus status;
     PyConfig config;
     String^ python_home;
@@ -42,12 +47,252 @@ int Main(array<String^>^ args) {
     PyObject *exc_traceback;
     PyObject *systemExit_code;
 
+    // Set the global debug state based on the runtime environment
+    _dupenv_s(&debug_mode, &size, "BRIEFCASE_DEBUG");
+
     // Uninitialize the Windows threading model; allow apps to make
     // their own threading model decisions.
     CoUninitialize();
 
     // Get details of the app from app metadata
     version_info = FileVersionInfo::GetVersionInfo(Application::ExecutablePath);
+
+    // Set up stdout/err handling
+    setup_stdout(version_info);
+
+    // Preconfigure the Python interpreter;
+    // This ensures the interpreter is in Isolated mode,
+    // and is using UTF-8 encoding.
+    debug_log("PreInitializing Python runtime...\n");
+    PyPreConfig pre_config;
+    PyPreConfig_InitPythonConfig(&pre_config);
+    pre_config.utf8_mode = 1;
+    pre_config.isolated = 1;
+    status = Py_PreInitialize(&pre_config);
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to pre-initialize Python runtime.");
+        Py_ExitStatusException(status);
+    }
+
+    // Pre-initialize Python configuration
+    PyConfig_InitIsolatedConfig(&config);
+
+    // Configure the Python interpreter:
+    // Don't buffer stdio. We want output to appears in the log immediately
+    config.buffered_stdio = 0;
+    // Don't write bytecode; we can't modify the app bundle
+    // after it has been signed.
+    config.write_bytecode = 0;
+    // Isolated apps need to set the full PYTHONPATH manually.
+    config.module_search_paths_set = 1;
+
+    // Set the home for the Python interpreter
+    python_home = Application::StartupPath;
+    debug_log("PythonHome: %S\n", wstr(python_home));
+    status = PyConfig_SetString(&config, &config.home, wstr(python_home));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set PYTHONHOME: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // Determine the app module name. Look for the BRIEFCASE_MAIN_MODULE
+    // environment variable first; if that exists, we're probably in test
+    // mode. If it doesn't exist, fall back to the MainModule key in the
+    // main bundle.
+    _wdupenv_s(&app_module_str, &size, L"BRIEFCASE_MAIN_MODULE");
+    if (app_module_str) {
+        app_module_name = gcnew String(app_module_str);
+    } else {
+        app_module_name = version_info->InternalName;
+        app_module_str = wstr(app_module_name);
+    }
+    status = PyConfig_SetString(&config, &config.run_module, app_module_str);
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // Read the site config
+    status = PyConfig_Read(&config);
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to read site config: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // Set the full module path. This includes the stdlib, site-packages, and app code.
+    debug_log("PYTHONPATH:\n");
+    // The .zip form of the stdlib
+    path = python_home + "\\python{{ cookiecutter.python_version|py_libtag }}.zip";
+    debug_log("- %S\n", wstr(path));
+    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set .zip form of stdlib path: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // The unpacked form of the stdlib
+    path = python_home;
+    debug_log("- %S\n", wstr(path));
+    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set unpacked form of stdlib path: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // Add the app_packages path
+    path = System::Windows::Forms::Application::StartupPath + "\\app_packages";
+    debug_log("- %S\n", wstr(path));
+    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set app packages path: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // Add the app path
+    path = System::Windows::Forms::Application::StartupPath + "\\app";
+    debug_log("- %S\n", wstr(path));
+    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set app path: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    debug_log("Configure argc/argv...\n");
+    wchar_t** argv = new wchar_t* [args->Length + 1];
+    argv[0] = wstr(Application::ExecutablePath);
+    for (int i = 0; i < args->Length; i++) {
+        argv[i + 1] = wstr(args[i]);
+    }
+    status = PyConfig_SetArgv(&config, args->Length + 1, argv);
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    debug_log("Initializing Python runtime...\n");
+    status = Py_InitializeFromConfig(&config);
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to initialize Python interpreter: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    try {
+        // Start the app module.
+        //
+        // From here to Py_ObjectCall(runmodule...) is effectively
+        // a copy of Py_RunMain() (and, more  specifically, the
+        // pymain_run_module() method); we need to re-implement it
+        // because we need to be able to inspect the error state of
+        // the interpreter, not just the return code of the module.
+        debug_log("Running app module: %S\n", app_module_str);
+
+        module = PyImport_ImportModule("runpy");
+        if (module == NULL) {
+            crash_dialog("Could not import runpy module");
+            exit(-2);
+        }
+
+        module_attr = PyObject_GetAttrString(module, "_run_module_as_main");
+        if (module_attr == NULL) {
+            crash_dialog("Could not access runpy._run_module_as_main");
+            exit(-3);
+        }
+
+        app_module = PyUnicode_FromWideChar(app_module_str, wcslen(app_module_str));
+        if (app_module == NULL) {
+            crash_dialog("Could not convert module name to unicode");
+            exit(-3);
+        }
+
+        method_args = Py_BuildValue("(Oi)", app_module, 0);
+        if (method_args == NULL) {
+            crash_dialog("Could not create arguments for runpy._run_module_as_main");
+            exit(-4);
+        }
+
+        // Print a separator to differentiate Python startup logs from app logs,
+        // then flush stdout/stderr to ensure all startup logs have been output.
+        debug_log("---------------------------------------------------------------------------\n");
+        fflush(stdout);
+        fflush(stderr);
+
+        // Invoke the app module
+        result = PyObject_Call(module_attr, method_args, NULL);
+
+        if (result == NULL) {
+            // Retrieve the current error state of the interpreter.
+            PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
+            PyErr_NormalizeException(&exc_type, &exc_value, &exc_traceback);
+
+            if (exc_traceback == NULL) {
+                crash_dialog("Could not retrieve traceback");
+                exit(-5);
+            }
+
+            if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
+                systemExit_code = PyObject_GetAttrString(exc_value, "code");
+                if (systemExit_code == NULL) {
+                    debug_log("Could not determine exit code\n");
+                    ret = -10;
+                }
+                else {
+                    ret = (int) PyLong_AsLong(systemExit_code);
+                }
+            } else {
+                // Non-SystemExit; likely an uncaught exception
+                ret = -6;
+                info_log("---------------------------------------------------------------------------\n");
+                info_log("Application quit abnormally!\n");
+
+                // Display stack trace in the crash dialog.
+                traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
+                crash_dialog(traceback_str);
+            }
+        }
+    }
+    catch (Exception^ exception) {
+        crash_dialog("Python runtime error: " + exception);
+        ret = -7;
+    }
+    Py_Finalize();
+
+    return ret;
+}
+
+wchar_t *wstr(String^ str)
+{
+    pin_ptr<const wchar_t> pinned = PtrToStringChars(str);
+    return (wchar_t*)pinned;
+}
+
+{% if cookiecutter.console_app %}
+void setup_stdout(FileVersionInfo^ version_info) {
+    // No special stdout handling required
+}
+
+void crash_dialog(System::String^ details) {
+    // Write the error to the console
+    printf("%S\n", wstr(details));
+}
+{% else %}
+/**
+ * Setup stdout and stderr to redirect to the console if it exists,
+ * but output to a file it doesn't.
+ */
+void setup_stdout(FileVersionInfo^ version_info) {
+    String^ log_folder;
+    String^ src_log;
+    String^ dst_log;
+    FILE *log;
 
     // If we can attach to the console, then we're running in a terminal;
     // we can use stdout and stderr as normal. However, if there's no
@@ -93,229 +338,7 @@ int Main(array<String^>^ args) {
         _wfreopen_s(&log, wstr(log_folder + "\\" + version_info->InternalName + ".log"), L"w", stdout);
     }
 
-    printf("Log started: %S\n", wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")));
-    // Preconfigure the Python interpreter;
-    // This ensures the interpreter is in Isolated mode,
-    // and is using UTF-8 encoding.
-    printf("PreInitializing Python runtime...\n");
-    PyPreConfig pre_config;
-    PyPreConfig_InitPythonConfig(&pre_config);
-    pre_config.utf8_mode = 1;
-    pre_config.isolated = 1;
-    status = Py_PreInitialize(&pre_config);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to pre-initialize Python runtime.");
-        Py_ExitStatusException(status);
-    }
-
-    // Pre-initialize Python configuration
-    PyConfig_InitIsolatedConfig(&config);
-
-    // Configure the Python interpreter:
-    // Don't buffer stdio. We want output to appears in the log immediately
-    config.buffered_stdio = 0;
-    // Don't write bytecode; we can't modify the app bundle
-    // after it has been signed.
-    config.write_bytecode = 0;
-    // Isolated apps need to set the full PYTHONPATH manually.
-    config.module_search_paths_set = 1;
-
-    // Set the home for the Python interpreter
-    python_home = Application::StartupPath;
-    printf("PythonHome: %S\n", wstr(python_home));
-    status = PyConfig_SetString(&config, &config.home, wstr(python_home));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set PYTHONHOME: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Determine the app module name. Look for the BRIEFCASE_MAIN_MODULE
-    // environment variable first; if that exists, we're probably in test
-    // mode. If it doesn't exist, fall back to the MainModule key in the
-    // main bundle.
-    _wdupenv_s(&app_module_str, &size, L"BRIEFCASE_MAIN_MODULE");
-    if (app_module_str) {
-        app_module_name = gcnew String(app_module_str);
-    } else {
-        app_module_name = version_info->InternalName;
-        app_module_str = wstr(app_module_name);
-    }
-    status = PyConfig_SetString(&config, &config.run_module, app_module_str);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Read the site config
-    status = PyConfig_Read(&config);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to read site config: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Set the full module path. This includes the stdlib, site-packages, and app code.
-    printf("PYTHONPATH:\n");
-    // The .zip form of the stdlib
-    path = python_home + "\\python{{ cookiecutter.python_version|py_libtag }}.zip";
-    printf("- %S\n", wstr(path));
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set .zip form of stdlib path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // The unpacked form of the stdlib
-    path = python_home;
-    printf("- %S\n", wstr(path));
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set unpacked form of stdlib path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Add the app_packages path
-    path = System::Windows::Forms::Application::StartupPath + "\\app_packages";
-    printf("- %S\n", wstr(path));
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app packages path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    // Add the app path
-    path = System::Windows::Forms::Application::StartupPath + "\\app";
-    printf("- %S\n", wstr(path));
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    printf("Configure argc/argv...\n");
-    wchar_t** argv = new wchar_t* [args->Length + 1];
-    argv[0] = wstr(Application::ExecutablePath);
-    for (int i = 0; i < args->Length; i++) {
-        argv[i + 1] = wstr(args[i]);
-    }
-    status = PyConfig_SetArgv(&config, args->Length + 1, argv);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    printf("Initializing Python runtime...\n");
-    status = Py_InitializeFromConfig(&config);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to initialize Python interpreter: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
-    try {
-        // Start the app module.
-        //
-        // From here to Py_ObjectCall(runmodule...) is effectively
-        // a copy of Py_RunMain() (and, more  specifically, the
-        // pymain_run_module() method); we need to re-implement it
-        // because we need to be able to inspect the error state of
-        // the interpreter, not just the return code of the module.
-        printf("Running app module: %S\n", app_module_str);
-
-        module = PyImport_ImportModule("runpy");
-        if (module == NULL) {
-            crash_dialog("Could not import runpy module");
-            exit(-2);
-        }
-
-        module_attr = PyObject_GetAttrString(module, "_run_module_as_main");
-        if (module_attr == NULL) {
-            crash_dialog("Could not access runpy._run_module_as_main");
-            exit(-3);
-        }
-
-        app_module = PyUnicode_FromWideChar(app_module_str, wcslen(app_module_str));
-        if (app_module == NULL) {
-            crash_dialog("Could not convert module name to unicode");
-            exit(-3);
-        }
-
-        method_args = Py_BuildValue("(Oi)", app_module, 0);
-        if (method_args == NULL) {
-            crash_dialog("Could not create arguments for runpy._run_module_as_main");
-            exit(-4);
-        }
-
-        // Print a separator to differentiate Python startup logs from app logs,
-        // then flush stdout/stderr to ensure all startup logs have been output.
-        printf("---------------------------------------------------------------------------\n");
-        fflush(stdout);
-        fflush(stderr);
-
-        // Invoke the app module
-        result = PyObject_Call(module_attr, method_args, NULL);
-
-        if (result == NULL) {
-            // Retrieve the current error state of the interpreter.
-            PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
-            PyErr_NormalizeException(&exc_type, &exc_value, &exc_traceback);
-
-            if (exc_traceback == NULL) {
-                crash_dialog("Could not retrieve traceback");
-                exit(-5);
-            }
-
-            if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
-                systemExit_code = PyObject_GetAttrString(exc_value, "code");
-                if (systemExit_code == NULL) {
-                    printf("Could not determine exit code\n");
-                    ret = -10;
-                }
-                else {
-                    ret = (int) PyLong_AsLong(systemExit_code);
-                }
-            } else {
-                ret = -6;
-            }
-
-            if (ret != 0) {
-                // Display stack trace in the crash dialog.
-                traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
-                printf("Application quit abnormally (Exit code %d)!\n", ret);
-
-                // Restore the error state of the interpreter.
-                PyErr_Restore(exc_type, exc_value, exc_traceback);
-
-                // Print exception to stderr.
-                // In case of SystemExit, this will call exit()
-                PyErr_Print();
-
-                // Display stack trace in the crash dialog.
-                crash_dialog(traceback_str);
-                exit(ret);
-            }
-        }
-    }
-    catch (Exception^ exception) {
-        crash_dialog("Python runtime error: " + exception);
-        ret = -7;
-    }
-    Py_Finalize();
-
-    return ret;
-}
-
-wchar_t *wstr(String^ str)
-{
-    pin_ptr<const wchar_t> pinned = PtrToStringChars(str);
-    return (wchar_t*)pinned;
+    debug_log("Log started: %S\n", wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")));
 }
 
 /**
@@ -338,6 +361,7 @@ void crash_dialog(System::String^ details) {
     form = gcnew Briefcase::CrashDialog(details);
     form->ShowDialog();
 }
+{% endif %}
 
 /**
  * Convert a Python traceback object into a user-suitable string, stripping off
