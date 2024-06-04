@@ -46,7 +46,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>{% if cookiecutter.console_app %}{{ cookiecutter.app_name }}{% else %}{{ cookiecutter.formal_name }}{% endif %}</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>{% if cookiecutter.console_app %}{{ cookiecutter.app_name }}{% else %}{{ cookiecutter.formal_name }}{% endif %}</TargetName>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -54,7 +59,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>Ole32.lib</AdditionalDependencies>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>{% if cookiecutter.console_app %}Console{% else %}Windows{% endif %}</SubSystem>
       <EntryPointSymbol>Main</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
@@ -65,7 +70,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>Ole32.lib</AdditionalDependencies>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>{% if cookiecutter.console_app %}Console{% else %}Windows{% endif %}</SubSystem>
       <EntryPointSymbol>Main</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
@@ -77,13 +82,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CrashDialog.cpp" />
+{% if not cookiecutter.console_app %}    <ClCompile Include="CrashDialog.cpp" />{% endif %}
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CrashDialog.h">
+{% if not cookiecutter.console_app %}    <ClInclude Include="CrashDialog.h">
       <FileType>CppForm</FileType>
-    </ClInclude>
+    </ClInclude>{% endif %}
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
