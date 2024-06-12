@@ -46,13 +46,16 @@ jobs:
         cd stub
         briefcase build windows visualstudio
 
-        echo "Build console stub artefact"
-        mv "./build/console-stub/windows/visualstudio/x64/Release/Console Stub.exe" ./Stub.exe
-        zip Console-Stub-${{ env.PYTHON_TAG }}-${{ steps.build-vars.outputs.BUILD_NUMBER }}.zip Stub.exe
+        echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} console stub artefact"
+        mv "./build/console-stub/windows/visualstudio/x64/Release/console-stub.exe" ./Stub.exe
+        zip Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
-        echo "Build GUI stub artefact"
+        echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} GUI stub artefact"
         mv "./build/gui-stub/windows/visualstudio/x64/Release/GUI Stub.exe" ./Stub.exe
-        zip GUI-Stub-${{ env.PYTHON_TAG }}-${{ steps.build-vars.outputs.BUILD_NUMBER }}.zip Stub.exe
+        zip GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
+
+        echo "Stub binaries:"
+        ls -1 *.zip
 
         echo "Stub binaries:"
         ls -1 *.zip
@@ -66,5 +69,5 @@ jobs:
         python -m pip install -U setuptools
         python -m pip install awscli
 
-        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ steps.build-vars.outputs.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ steps.build-vars.  outputs.PY_VERSION }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ steps.build-vars.outputs.BUILD_NUMBER }}.zip
-        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ steps.build-vars.outputs.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ steps.build-vars.outputs.PY_VERSION }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ steps.build-vars.outputs.BUILD_NUMBER }}.zip
+        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip
+        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip
