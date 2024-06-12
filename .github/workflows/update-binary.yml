@@ -48,14 +48,11 @@ jobs:
 
         echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} console stub artefact"
         mv "./build/console-stub/windows/visualstudio/x64/Release/console-stub.exe" ./Stub.exe
-        zip Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
+        7z a Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
         echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} GUI stub artefact"
         mv "./build/gui-stub/windows/visualstudio/x64/Release/GUI Stub.exe" ./Stub.exe
-        zip GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
-
-        echo "Stub binaries:"
-        ls -1 *.zip
+        7z a GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
         echo "Stub binaries:"
         ls -1 *.zip
