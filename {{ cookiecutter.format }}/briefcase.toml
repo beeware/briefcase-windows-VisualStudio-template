@@ -3,13 +3,13 @@
 app_path = "x64/Release/app"
 app_packages_path = "x64/Release/app_packages"
 support_path = "x64/Release"
-{# Minor versions for 3.9 and 3.10 cannot be bumped further since -#}
-{# Python is not hosting embeddable zipped versions of them -#}
+{# Minor versions for 3.9, 3.10, and 3.11 cannot be bumped further -#}
+{# since Python is not hosting embeddable zipped versions of them -#}
 {{ {
     "3.9": "support_revision = 13",
     "3.10": "support_revision = 11",
     "3.11": "support_revision = 9",
-    "3.12": "support_revision = 5",
+    "3.12": "support_revision = 7",
 }.get(cookiecutter.python_version|py_tag, "") }}
 
 icon = "{{ cookiecutter.formal_name }}/icon.ico"
