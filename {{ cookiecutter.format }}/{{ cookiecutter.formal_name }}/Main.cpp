@@ -239,7 +239,7 @@ int Main(array<String^>^ args) {
                 exit(-5);
             }
 
-            traceback_str = NULL;
+            traceback_str = nullptr;
             if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
                 systemExit_code = PyObject_GetAttrString(exc_value, "code");
                 if (systemExit_code == NULL) {
@@ -262,7 +262,7 @@ int Main(array<String^>^ args) {
                 traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
             }
 
-            if (traceback_str != NULL) {
+            if (traceback_str != nullptr) {
                 // Display stack trace in the crash dialog.
                 crash_dialog(traceback_str);
             }
