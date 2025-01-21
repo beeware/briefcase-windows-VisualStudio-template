@@ -248,17 +248,15 @@ int Main(array<String^>^ args) {
                     // SystemExit with error code
                     ret = (int) PyLong_AsLong(systemExit_code);
                 } else {
-                    // Convert exit code to a string. This is required by runpy._error
-                    ret = -11;
-                    info_log("---------------------------------------------------------------------------\n");
-                    info_log("Application quit abnormally!\n");
-
-                    // Display exit message in the crash dialog.
-                    crash_dialog(PyObject_CppString(systemExit_code));
+                    // SystemExit with a string for an error code.
+                    ret = 1;
                 }
             } else {
                 // Non-SystemExit; likely an uncaught exception
                 ret = -6;
+            }
+
+            if (ret != 0) {
                 info_log("---------------------------------------------------------------------------\n");
                 info_log("Application quit abnormally!\n");
 
