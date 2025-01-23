@@ -25,6 +25,7 @@ wchar_t* wstr(String^);
 void setup_stdout(FileVersionInfo^);
 void crash_dialog(String^);
 String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback);
+String^ PyObject_CppString(PyObject *obj);
 
 int Main(array<String^>^ args) {
     int ret = 0;
@@ -238,23 +239,36 @@ int Main(array<String^>^ args) {
                 exit(-5);
             }
 
+            traceback_str = nullptr;
             if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
                 systemExit_code = PyObject_GetAttrString(exc_value, "code");
                 if (systemExit_code == NULL) {
-                    debug_log("Could not determine exit code\n");
+                    traceback_str = "Could not determine exit code";
                     ret = -10;
-                }
-                else {
+                } else if (systemExit_code == Py_None) {
+                    // SystemExit with a code of None; documented as a return
+                    // code of 0.
+                    ret = 0;
+                } else if (PyLong_Check(systemExit_code)) {
+                    // SystemExit with error code
                     ret = (int) PyLong_AsLong(systemExit_code);
+                } else {
+                    // Any other SystemExit value - convert to a string, and use
+                    // the string as the traceback, and use the documented
+                    // SystemExit return value of 1.
+                    ret = 1;
+                    traceback_str = PyObject_CppString(systemExit_code);
                 }
             } else {
                 // Non-SystemExit; likely an uncaught exception
-                ret = -6;
                 info_log("---------------------------------------------------------------------------\n");
                 info_log("Application quit abnormally!\n");
-
-                // Display stack trace in the crash dialog.
+                ret = -6;
                 traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
+            }
+
+            if (traceback_str != nullptr) {
+                // Display stack trace in the crash dialog.
                 crash_dialog(traceback_str);
             }
         }
@@ -364,6 +378,20 @@ void crash_dialog(System::String^ details) {
 {% endif %}
 
 /**
+ * Convert a Python object into a C++ String^. It's easiest to do this by
+ * using the Python API to encode to UTF-8, and then convert the UTF-8 byte
+ * string into UTF-16 using Windows APIs.
+ */
+String^ PyObject_CppString(PyObject* obj) {
+    Py_ssize_t size;
+    System::Text::UTF8Encoding^ utf8 = gcnew System::Text::UTF8Encoding;
+
+    const char* bytes = PyUnicode_AsUTF8AndSize(PyObject_Str(obj), &size);
+
+    return gcnew String(utf8->GetString((Byte *)bytes, (int) size));
+}
+
+/**
  * Convert a Python traceback object into a user-suitable string, stripping off
  * stack context that comes from this stub binary.
  *
@@ -410,13 +438,7 @@ String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback) {
     traceback_unicode = PyUnicode_Join(PyUnicode_FromString(""), traceback_list);
 
     // Convert the Python Unicode string into a UTF-16 Windows String.
-    // It's easiest to do this by using the Python API to encode to UTF-8,
-    // and then convert the UTF-8 byte string into UTF-16 using Windows APIs.
-    Py_ssize_t size;
-    const char* bytes = PyUnicode_AsUTF8AndSize(PyObject_Str(traceback_unicode), &size);
-
-    System::Text::UTF8Encoding^ utf8 = gcnew System::Text::UTF8Encoding;
-    traceback_str = gcnew String(utf8->GetString((Byte *)bytes, (int) size));
+    traceback_str = PyObject_CppString(traceback_unicode);
 
     // Clean up the traceback string, removing references to the installed app location
     traceback_str = traceback_str->Replace(Application::StartupPath, "");
