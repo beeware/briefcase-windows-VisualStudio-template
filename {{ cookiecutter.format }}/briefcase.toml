@@ -14,3 +14,6 @@ support_path = "x64/Release"
 }.get(cookiecutter.python_version|py_tag, "") }}
 
 icon = "{{ cookiecutter.formal_name }}/icon.ico"
+cleanup_paths = [
+    "x64/Release/python*.exe",
+]
