@@ -14,6 +14,9 @@ support_path = "x64/Release"
 }.get(cookiecutter.python_version|py_tag, "") }}
 
 icon = "{{ cookiecutter.formal_name }}/icon.ico"
+{% for document_type_id, document_type in cookiecutter.document_types.items() -%}
+document_type_icon.{{ document_type_id }} = "{{ cookiecutter.app_name }}-{{ document_type_id }}.ico"
+{% endfor %}
 cleanup_paths = [
     "x64/Release/python*.exe",
 ]
