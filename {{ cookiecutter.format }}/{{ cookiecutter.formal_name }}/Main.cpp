@@ -208,7 +208,7 @@ int Main(array<String^>^ args) {
 
         method_args = Py_BuildValue("(O)", app_packages_path);
         if (method_args == NULL) {
-            crash_dialog("Could not create arguments for runpy._run_module_as_main");
+            crash_dialog("Could not create arguments for site.addsitedir");
             exit(-11);
         }
 
