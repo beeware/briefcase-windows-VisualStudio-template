@@ -201,7 +201,7 @@ int Main(array<String^>^ args) {
         }
 
         app_packages_path = PyUnicode_FromWideChar(app_packages_path_str, wcslen(app_packages_path_str));
-        if (app_module == NULL) {
+        if (app_packages_path == NULL) {
             crash_dialog("Could not convert app_packages path to unicode");
             exit(-10);
         }
