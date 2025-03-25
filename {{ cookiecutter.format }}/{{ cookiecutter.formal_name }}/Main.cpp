@@ -37,7 +37,9 @@ int Main(array<String^>^ args) {
     String^ app_module_name;
     String^ path;
     String^ traceback_str;
+    wchar_t *app_packages_path_str;
     wchar_t *app_module_str;
+    PyObject *app_packages_path;
     PyObject *app_module;
     PyObject *module;
     PyObject *module_attr;
@@ -145,16 +147,6 @@ int Main(array<String^>^ args) {
         Py_ExitStatusException(status);
     }
 
-    // Add the app_packages path
-    path = System::Windows::Forms::Application::StartupPath + "\\app_packages";
-    debug_log("- %S\n", wstr(path));
-    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app packages path: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
     // Add the app path
     path = System::Windows::Forms::Application::StartupPath + "\\app";
     debug_log("- %S\n", wstr(path));
@@ -187,6 +179,45 @@ int Main(array<String^>^ args) {
     }
 
     try {
+        // Adding the app_packages as site directory.
+        //
+        // This adds app_packages to sys.path and executes any .pth
+        // files in that directory.
+        path = System::Windows::Forms::Application::StartupPath + "\\app_packages";
+        app_packages_path_str = wstr(path);
+
+        debug_log("Adding app_packages as site directory: %S\n", app_packages_path_str);
+
+        module = PyImport_ImportModule("site");
+        if (module == NULL) {
+            crash_dialog("Could not import site module");
+            exit(-11);
+        }
+
+        module_attr = PyObject_GetAttrString(module, "addsitedir");
+        if (module_attr == NULL || !PyCallable_Check(module_attr)) {
+            crash_dialog("Could not access site.addsitedir");
+            exit(-12);
+        }
+
+        app_packages_path = PyUnicode_FromWideChar(app_packages_path_str, wcslen(app_packages_path_str));
+        if (app_packages_path == NULL) {
+            crash_dialog("Could not convert app_packages path to unicode");
+            exit(-13);
+        }
+
+        method_args = Py_BuildValue("(O)", app_packages_path);
+        if (method_args == NULL) {
+            crash_dialog("Could not create arguments for site.addsitedir");
+            exit(-14);
+        }
+
+        result = PyObject_CallObject(module_attr, method_args);
+        if (result == NULL) {
+            crash_dialog("Could not add app_packages directory using site.addsitedir");
+            exit(-15);
+        }
+
         // Start the app module.
         //
         // From here to Py_ObjectCall(runmodule...) is effectively
