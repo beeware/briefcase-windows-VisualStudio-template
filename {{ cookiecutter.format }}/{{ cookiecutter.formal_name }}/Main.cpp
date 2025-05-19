@@ -13,6 +13,7 @@ using namespace System;
 using namespace System::Diagnostics;
 using namespace System::IO;
 using namespace System::Windows::Forms;
+using namespace System::Globalization;  // for timestamp formatting
 
 
 // A global indicator of the debug level
@@ -20,6 +21,8 @@ char *debug_mode;
 
 #define info_log(...) printf(__VA_ARGS__)
 #define debug_log(...) if (debug_mode) printf(__VA_ARGS__)
+
+#define MAX_LOG_FILE_AGE_DAYS 7
 
 wchar_t* wstr(String^);
 void setup_stdout(FileVersionInfo^);
@@ -336,7 +339,6 @@ void crash_dialog(System::String^ details) {
 void setup_stdout(FileVersionInfo^ version_info) {
     String^ log_folder;
     String^ src_log;
-    String^ dst_log;
     FILE *log;
 
     // If we can attach to the console, then we're running in a terminal;
@@ -350,37 +352,34 @@ void setup_stdout(FileVersionInfo^ version_info) {
             // If log folder doesn't exist, create it
             Directory::CreateDirectory(log_folder);
         } else {
-            // If it does, rotate the logs in that folder.
-            // - Delete <app name>-9.log
-            src_log = log_folder + "\\" + version_info->InternalName + "-9.log";
-            if (File::Exists(src_log)) {
-                File::Delete(src_log);
-            }
-
-            // - Move <app name>-8.log -> <app name>-9.log
-            // - Move <app name>-7.log -> <app name>-8.log
-            // - ...
-            // - Move <app name>.log -> <app name>-2.log
-            for (int dst_index = 9; dst_index >= 2; dst_index--) {
-                if (dst_index == 2) {
-                    src_log = log_folder + "\\" + version_info->InternalName + ".log";
-                } else {
-                    src_log = log_folder + "\\" + version_info->InternalName + "-" + (dst_index - 1) + ".log";
+            // Attempt to delete log files older than the configured time
+            TimeSpan maxAge = TimeSpan::FromDays(MAX_LOG_FILE_AGE_DAYS);
+            array<String^>^ logFiles = Directory::GetFiles(log_folder, version_info->InternalName + "_*.log");
+            DateTime now = DateTime::Now;
+            for each (String^ file in logFiles) {
+                try {
+                    DateTime creationTime = File::GetCreationTime(file);
+                    if (now - creationTime > maxAge) {
+                        File::Delete(file);
+                    }
                 }
-                dst_log = log_folder + "\\" + version_info->InternalName + "-" + dst_index + ".log";
-
-                if (File::Exists(src_log)) {
-                    File::Move(src_log, dst_log);
+                catch (Exception^ ex) {
+                    // Log a message if the file could not be deleted
+                    debug_log("Could not delete old log file: %S (%S)\n", wstr(file), wstr(ex->Message));
                 }
             }
         }
 
-        // Redirect stdout to a log file <app name>.log, in the
+        // Redirect stdout to a log file, in the
         // user's local Logs folder for the app.
         // stderr doesn't exist when running without an attached console;
         // sys.stderr will be None in the Python interpreter. This causes
         // all error output to be written to stdout.
-        _wfreopen_s(&log, wstr(log_folder + "\\" + version_info->InternalName + ".log"), L"w", stdout);
+
+        // Get current timestamp in format yyyyMMdd_HHmmss_fff (with milliseconds)
+        String^ timestamp = DateTime::Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo::InvariantCulture);
+        src_log = log_folder + "\\" + version_info->InternalName + "." + timestamp + ".log";
+        _wfreopen_s(&log, wstr(src_log), L"w", stdout);
     }
 
     debug_log("Log started: %S\n", wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")));
