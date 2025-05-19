@@ -378,7 +378,7 @@ void setup_stdout(FileVersionInfo^ version_info) {
 
         // Get current timestamp in format yyyyMMdd_HHmmss_fff (with milliseconds)
         String^ timestamp = DateTime::Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo::InvariantCulture);
-        src_log = log_folder + "\\" + version_info->InternalName + "_" + timestamp + ".log";
+        src_log = log_folder + "\\" + version_info->InternalName + "." + timestamp + ".log";
         _wfreopen_s(&log, wstr(src_log), L"w", stdout);
     }
 
