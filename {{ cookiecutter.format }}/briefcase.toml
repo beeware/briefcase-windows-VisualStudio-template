@@ -1,4 +1,7 @@
 # Generated using Python {{ cookiecutter.python_version }}
+[briefcase]
+target_version = "0.3.24"
+
 [paths]
 app_path = "x64/Release/app"
 app_packages_path = "x64/Release/app_packages"
