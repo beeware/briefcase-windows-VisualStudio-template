@@ -72,8 +72,13 @@ int Main(array<String^>^ args) {
     debug_log("PreInitializing Python runtime...\n");
     PyPreConfig pre_config;
     PyPreConfig_InitPythonConfig(&pre_config);
+    // Enforce UTF-8 encoding for stderr, stdout, file-system encoding and locale.
+    // See https://docs.python.org/3/library/os.html#python-utf-8-mode.
     pre_config.utf8_mode = 1;
+    // Ensure the locale is set (isolated interpreters won't by default)
+    pre_config.configure_locale = 1;
     pre_config.isolated = 1;
+
     status = Py_PreInitialize(&pre_config);
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to pre-initialize Python runtime.");
