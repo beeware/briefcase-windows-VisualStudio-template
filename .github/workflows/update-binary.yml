@@ -1,8 +1,13 @@
 name: Update binary
 on:
+  pull_request:
   push:
     tags:
     - 'b*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
@@ -34,6 +39,7 @@ jobs:
       uses: actions/setup-python@v5.6.0
       with:
         python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
 
     - name: Install Dependencies
       run: |
@@ -58,6 +64,7 @@ jobs:
         ls -1 *.zip
 
     - name: Upload Release Asset to S3
+      if: github.event_name == 'push'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
