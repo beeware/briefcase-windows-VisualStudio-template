@@ -10,7 +10,7 @@
 
         <Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
 
-        <Icon Id="ProductIcon" SourceFile="{{ cookiecutter.formal_name }}/icon.ico" />
+        <Icon Id="ProductIcon" SourceFile="{{ cookiecutter.formal_name|xml_escape }}/icon.ico" />
 
         <!-- Add/Remove Programs settings -->
         <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
@@ -42,7 +42,7 @@
             {%- endif %}
         </StandardDirectory>
 
-        <ComponentGroup Id="{{ cookiecutter.module_name }}_COMPONENTS">
+        <ComponentGroup Id="{{ cookiecutter.module_name|xml_escape }}_COMPONENTS">
             <!-- "\\?\" enables long paths (https://github.com/wixtoolset/issues/issues/9115). -->
             <Files
                 Directory="INSTALLFOLDER"
@@ -81,14 +81,14 @@
             Id="FileAssociation.{{ document_type_id }}"
             Directory="INSTALLFOLDER">
             <File
-                Id="ProductIcon.{{ document_type_id }}"
-                Source="{{ cookiecutter.app_name }}-{{ document_type_id }}.ico" />
+                Id="ProductIcon.{{ document_type_id|xml_escape }}"
+                Source="{{ cookiecutter.app_name }}-{{ document_type_id|xml_escape }}.ico" />
             <ProgId
-                Id="{{ cookiecutter.bundle }}.{{ cookiecutter.app_name }}.{{ document_type_id }}"
+                Id="{{ cookiecutter.bundle|xml_escape }}.{{ cookiecutter.app_name|xml_escape }}.{{ document_type_id|xml_escape }}"
                 Description="{{ document_type.description|xml_escape }}"
                 Icon="ProductIcon.{{ document_type_id }}">
                 <Extension
-                    Id="{{ document_type.extension }}"
+                    Id="{{ document_type.extension|xml_escape }}"
                     ContentType="{% if document_type.get('mime_type') %}{{ document_type.mime_type|xml_escape }}{% else %}application/x-{{ cookiecutter.app_name }}-{{ document_type_id }}{% endif %}">
                     <Verb
                         Id="open"
@@ -102,7 +102,7 @@
         {%- endif %}
 
         <Feature Id="DefaultFeature">
-            <ComponentGroupRef Id="{{ cookiecutter.module_name }}_COMPONENTS" />
+            <ComponentGroupRef Id="{{ cookiecutter.module_name|xml_escape }}_COMPONENTS" />
             <ComponentRef Id="ApplicationShortcuts" />
             {%- for document_type_id in cookiecutter.document_types.keys()|sort %}
             <ComponentRef Id="FileAssociation.{{ document_type_id }}" />
