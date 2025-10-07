@@ -6,7 +6,6 @@
     "bundle": "com.example",
     "version_triple": "0.0.1",
     "author": "Example Corporation",
-    "safe_author": "{{ cookiecutter.author|xml_escape }}",
     "author_email": "contact@example.com",
     "url": "http://example.com",
     "description": "Short description of app",
