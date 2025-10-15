@@ -183,6 +183,7 @@
             Level="0"
             Title="User PATH modifications"
             Description="Add the application to the user's PATH"
+            Display="hidden"
         >
             <Level Condition="NOT ALLUSERS {{ ui_condition }}" Value="1" />
             <Component
@@ -202,6 +203,7 @@
             Level="0"
             Title="System PATH modifications"
             Description="Add the application to the system PATH"
+            Display="hidden"
         >
             <Level Condition="ALLUSERS {{ ui_condition }}" Value="1" />
             <Component
