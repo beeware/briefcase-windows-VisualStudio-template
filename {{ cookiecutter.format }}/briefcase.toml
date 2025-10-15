@@ -6,6 +6,7 @@ target_version = "0.3.24"
 app_path = "x64/Release/app"
 app_packages_path = "x64/Release/app_packages"
 support_path = "x64/Release"
+extras_path = "extras"
 {# Minor versions for 3.10, 3.11, and 3.12 cannot be bumped further -#}
 {# since Python is not hosting embeddable zipped versions of them -#}
 {{ {
