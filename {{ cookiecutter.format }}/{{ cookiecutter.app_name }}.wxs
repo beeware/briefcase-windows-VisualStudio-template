@@ -24,11 +24,11 @@
         <Property Id="ARPNOREPAIR" Value="1" />
         <Property Id="ARPNOMODIFY" Value="1" />
 
-        <!-- If we ever add the InstallDirDlg, it will use this property to control the
-        target directory. The value must be upper case to make it a public property
-        that will be passed to the execution phase. And since WiX will create a default
-        INSTALLFOLDER directory under certain circumstances, let's override that with
-        our own definition to avoid confusion. -->
+        <!-- This property controls the target directory set by the
+        InstallDirDlg. The value must be upper case to make it a public property
+        that will be passed to the execution phase. And since WiX will create a
+        default INSTALLFOLDER directory under certain circumstances, let's
+        override that with our own definition to avoid confusion. -->
         <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
         <!-- This is either the per-user or the per-machine Program Files folder,
@@ -411,6 +411,7 @@
              * Welcome
              * License
              * (optional) Install Scope (see notes below)
+             * Install Directory
              * (optional) Install options
              * Verify Ready
              * Exit
@@ -435,8 +436,8 @@
                 execution phase.
 
             * Properties that depend on a ProgramFiles folder are immediately
-              re-evaluated in the following circumstances. This will be important for
-              the InstallDirDlg, if we ever add it:
+              re-evaluated in the following circumstances. This is important for
+              the InstallDirDlg:
               * Setting ALLUSERS=1 sets the per-machine location.
               * Setting ALLUSERS="", MSIINSTALLPERUSER=1, in that order, sets the
                 per-user location.
@@ -492,7 +493,7 @@
                 Dialog="InstallOptionsDlg"
                 Control="Back"
                 Event="NewDialog"
-                Value="InstallScopeDlg" />
+                Value="InstallDirDlg" />
             <Publish
                 Dialog="InstallOptionsDlg"
                 Control="Next"
