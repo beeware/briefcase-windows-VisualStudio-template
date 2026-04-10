@@ -15,10 +15,17 @@ defaults:
 jobs:
   build-stubs:
     name: Build stub binaries
-    runs-on: windows-latest
     strategy:
       matrix:
         python-version: [ "3.10", "3.11", "3.12", "3.13", "3.14" ]
+        config:
+          - runner: windows-latest
+            arch: x64
+            suffix: ''
+          - runner: windows-11-arm
+            arch: ARM64
+            suffix: '-arm'
+    runs-on: ${{ matrix.config.runner }}
     steps:
     - name: Set Build Variables
       id: build-vars
@@ -52,11 +59,11 @@ jobs:
         briefcase build windows visualstudio
 
         echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} console stub artefact"
-        mv "./build/console-stub/windows/visualstudio/x64/Release/console-stub.exe" ./Stub.exe
+        mv "./build/console-stub/windows/visualstudio/${{ matrix.config.arch }}/Release/console-stub.exe" ./Stub.exe
         7z a Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
         echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} GUI stub artefact"
-        mv "./build/gui-stub/windows/visualstudio/x64/Release/GUI Stub.exe" ./Stub.exe
+        mv "./build/gui-stub/windows/visualstudio/${{ matrix.config.arch }}/Release/GUI Stub.exe" ./Stub.exe
         7z a GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
         echo "Stub binaries:"
@@ -72,5 +79,5 @@ jobs:
         python -m pip install -U setuptools
         python -m pip install awscli
 
-        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip
-        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip
+        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}${{ matrix.config.suffix }}.zip
+        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}${{ matrix.config.suffix }}.zip
