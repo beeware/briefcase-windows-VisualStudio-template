@@ -21,10 +21,10 @@ jobs:
         config:
           - runner: windows-latest
             arch: x64
-            suffix: ''
+            suffix: '-amd64'
           - runner: windows-11-arm
             arch: ARM64
-            suffix: '-arm'
+            suffix: '-arm64'
     runs-on: ${{ matrix.config.runner }}
     steps:
     - name: Set Build Variables
