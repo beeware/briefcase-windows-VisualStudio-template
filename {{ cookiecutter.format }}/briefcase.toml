@@ -3,9 +3,9 @@
 target_version = "0.3.24"
 
 [paths]
-app_path = "{{ cookiecutter.configuration }}/Release/app"
-app_packages_path = "{{ cookiecutter.configuration }}/Release/app_packages"
-support_path = "{{ cookiecutter.configuration }}/Release"
+app_path = "{{ cookiecutter.vscode_platform }}/Release/app"
+app_packages_path = "{{ cookiecutter.vscode_platform }}/Release/app_packages"
+support_path = "{{ cookiecutter.vscode_platform }}/Release"
 extras_path = "extras"
 {# Minor versions for 3.10, 3.11, and 3.12 cannot be bumped further -#}
 {# since Python is not hosting embeddable zipped versions of them -#}
@@ -22,5 +22,5 @@ icon = "{{ cookiecutter.formal_name }}/icon.ico"
 document_type_icon.{{ document_type_id }} = "{{ cookiecutter.app_name }}-{{ document_type_id }}.ico"
 {% endfor %}
 cleanup_paths = [
-    "{{ cookiecutter.configuration }}/Release/python*.exe",
+    "{{ cookiecutter.vscode_platform }}/Release/python*.exe",
 ]
