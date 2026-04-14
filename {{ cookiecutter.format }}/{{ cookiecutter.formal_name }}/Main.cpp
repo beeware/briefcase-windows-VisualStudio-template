@@ -385,6 +385,11 @@ void setup_stdout(FileVersionInfo^ version_info) {
         String^ timestamp = DateTime::Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo::InvariantCulture);
         src_log = log_folder + "\\" + version_info->InternalName + "." + timestamp + ".log";
         _wfreopen_s(&log, wstr(src_log), L"w", stdout);
+    } else {
+        // Python uses the CRT for I/O, and it requires the descriptors are reopened.
+        freopen("CONIN$", "r", stdin);
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
     }
 
     debug_log("Log started: %S\n", wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")));
