@@ -387,9 +387,15 @@ void setup_stdout(FileVersionInfo^ version_info) {
         _wfreopen_s(&log, wstr(src_log), L"w", stdout);
     } else {
         // Python uses the CRT for I/O, and it requires the descriptors are reopened.
-        freopen("CONIN$", "r", stdin);
-        freopen("CONOUT$", "w", stdout);
-        freopen("CONOUT$", "w", stderr);
+        // Windows GUI apps return to the prompt immediately, so console output from
+        // this app is able to contaminate output from other commands being executed;
+        // but that's better than not seeing console output at all.
+        FILE *new_stdin;
+        FILE *new_stdout;
+        FILE *new_stderr;
+        freopen_s(&new_stdin, "CONIN$", "r", stdin);
+        freopen_s(&new_stdout, "CONOUT$", "w", stdout);
+        freopen_s(&new_stderr, "CONOUT$", "w", stderr);
     }
 
     debug_log("Log started: %S\n", wstr(DateTime::Now.ToString("yyyy-MM-dd HH:mm:ssZ")));
