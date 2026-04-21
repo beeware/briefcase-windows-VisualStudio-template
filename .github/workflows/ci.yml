@@ -31,7 +31,7 @@ jobs:
     uses: beeware/.github/.github/workflows/app-build-verify.yml@main
     with:
       python-version: ${{ matrix.python-version }}
-      runner-os: windows-latest
+      runner-os: ${{ matrix.runs-on }}
       framework: ${{ matrix.framework }}
       target-platform: windows
       target-format: VisualStudio
@@ -40,10 +40,32 @@ jobs:
       matrix:
         python-version: [ "3.10", "3.11", "3.12", "3.13", "3.14" ]
         framework: [ "toga", "pyside6", "pygame", "console" ]
-        # Pygame hasn't published 3.14 wheels yet.
-        # Toga is waiting on a release of Python.net for 3.14
+        runs-on: ["windows-latest", "windows-11-arm"]
         exclude:
+          # Pygame hasn't published 3.14 or ARM64 wheels.
           - python-version: "3.14"
             framework: pygame
+            runs-on: windows-latest
+          # Pygame hasn't published any ARM64 wheels.
+          - python-version: "3.10"
+            framework: pygame
+            runs-on: windows-11-arm
+          - python-version: "3.11"
+            framework: pygame
+            runs-on: windows-11-arm
+          - python-version: "3.12"
+            framework: pygame
+            runs-on: windows-11-arm
+          - python-version: "3.13"
+            framework: pygame
+            runs-on: windows-11-arm
+          - python-version: "3.14"
+            framework: pygame
+            runs-on: windows-11-arm
+          # Toga is waiting on a release of Python.net for 3.14
           - python-version: "3.14"
             framework: toga
+            runs-on: windows-latest
+          - python-version: "3.14"
+            framework: toga
+            runs-on: windows-11-arm
