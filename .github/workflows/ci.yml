@@ -42,30 +42,16 @@ jobs:
         framework: [ "toga", "pyside6", "pygame", "console" ]
         runs-on: ["windows-latest", "windows-11-arm"]
         exclude:
+          # Github Actions doesn't provide ARM64 builds for Python 3.10
+          - python-version: "3.10"
+            runs-on: "windows-11-arm"
           # Pygame hasn't published 3.14 or ARM64 wheels.
           - python-version: "3.14"
             framework: pygame
             runs-on: windows-latest
           # Pygame hasn't published any ARM64 wheels.
-          - python-version: "3.10"
-            framework: pygame
-            runs-on: windows-11-arm
-          - python-version: "3.11"
-            framework: pygame
-            runs-on: windows-11-arm
-          - python-version: "3.12"
-            framework: pygame
-            runs-on: windows-11-arm
-          - python-version: "3.13"
-            framework: pygame
-            runs-on: windows-11-arm
-          - python-version: "3.14"
-            framework: pygame
+          - framework: pygame
             runs-on: windows-11-arm
           # Toga is waiting on a release of Python.net for 3.14
           - python-version: "3.14"
             framework: toga
-            runs-on: windows-latest
-          - python-version: "3.14"
-            framework: toga
-            runs-on: windows-11-arm
