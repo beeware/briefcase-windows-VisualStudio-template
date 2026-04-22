@@ -48,13 +48,13 @@ jobs:
           # Pygame hasn't published 3.14 wheels.
           - python-version: "3.14"
             framework: pygame
-            runs-on: windows-latest
           # Pygame hasn't published any Windows/ARM64 wheels.
           - framework: pygame
             runs-on: windows-11-arm
           # Toga is waiting on a release of Python.net for 3.14
           - python-version: "3.14"
             framework: toga
-          # Toga tests won't run on Windows/ARM64 until Toga#4331 lands
+          # Toga tests won't run on Windows/ARM64 until
+          # https://github.com/actions/partner-runner-images/issues/174 is resolved
           - framework: "toga"
             runs-on: windows-11-arm

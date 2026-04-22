@@ -345,11 +345,6 @@ void setup_stdout(FileVersionInfo^ version_info) {
     String^ log_folder;
     String^ src_log;
     FILE *log;
-    FILE *new_stdin;
-    FILE *new_stdout;
-    FILE *new_stderr;
-    wchar_t *app_module_str;
-    size_t size;
 
     // If we can attach to the console, then we're running in a terminal;
     // we can use stdout and stderr as normal. However, if there's no
@@ -396,6 +391,12 @@ void setup_stdout(FileVersionInfo^ version_info) {
         // this app is able to contaminate output from other commands being executed;
         // but that's better than not seeing console output at all. However, we can't
         // do this in test mode, because it prevents Briefcase seeing test output.
+        FILE *new_stdin;
+        FILE *new_stdout;
+        FILE *new_stderr;
+        wchar_t *app_module_str;
+        size_t size;
+
         _wdupenv_s(&app_module_str, &size, L"BRIEFCASE_MAIN_MODULE");
         if (!app_module_str) {
             freopen_s(&new_stdin, "CONIN$", "r", stdin);
