@@ -21,18 +21,18 @@ jobs:
         python-version: [ "3.11", "3.12", "3.13", "3.14" ]
         config:
           - runner: windows-latest
-            arch: x64
-            suffix: '-amd64'
+            vscode_arch: x64
+            arch: amd64
           - runner: windows-11-arm
-            arch: ARM64
-            suffix: '-arm64'
+            vscode_arch: ARM64
+            arch: arm64
         include:
           # GitHub doesn't provide ARM64 binaries for Python 3.10
           - python-version: "3.10"
             config:
               runner: windows-latest
-              arch: x64
-              suffix: '-amd64'
+              vscode_arch: x64
+              arch: amd64
 
     runs-on: ${{ matrix.config.runner }}
     steps:
@@ -67,13 +67,13 @@ jobs:
         cd stub
         briefcase build windows visualstudio
 
-        echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} console stub artefact"
-        mv "./build/console-stub/windows/visualstudio/${{ matrix.config.arch }}/Release/console-stub.exe" ./Stub.exe
-        7z a Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
+        echo "Build ${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }} console stub artefact"
+        mv "./build/console-stub/windows/visualstudio/${{ matrix.config.vscode_arch }}/Release/console-stub.exe" ./Stub.exe
+        7z a Console-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
-        echo "Build ${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }} GUI stub artefact"
-        mv "./build/gui-stub/windows/visualstudio/${{ matrix.config.arch }}/Release/GUI Stub.exe" ./Stub.exe
-        7z a GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
+        echo "Build ${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }} GUI stub artefact"
+        mv "./build/gui-stub/windows/visualstudio/${{ matrix.config.vscode_arch }}/Release/GUI Stub.exe" ./Stub.exe
+        7z a GUI-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
 
         echo "Stub binaries:"
         ls -1 *.zip
@@ -88,5 +88,5 @@ jobs:
         python -m pip install -U setuptools
         python -m pip install awscli
 
-        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}${{ matrix.config.suffix }}.zip
-        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ env.BUILD_NUMBER }}${{ matrix.config.suffix }}.zip
+        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip
+        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip

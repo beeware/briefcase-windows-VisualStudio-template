@@ -6,3 +6,5 @@ venv/
 stub/build/
 stub/dist/
 stub/logs/
+*.zip
+*.exe
