@@ -20,7 +20,7 @@ jobs:
       matrix:
         python-version: [ "3.11", "3.12", "3.13", "3.14" ]
         config:
-          - runner: windows-latest
+          - runner: windows-2022
             vscode_arch: x64
             arch: amd64
           - runner: windows-11-arm
@@ -30,7 +30,7 @@ jobs:
           # GitHub doesn't provide ARM64 binaries for Python 3.10
           - python-version: "3.10"
             config:
-              runner: windows-latest
+              runner: windows-2022
               vscode_arch: x64
               arch: amd64
 
