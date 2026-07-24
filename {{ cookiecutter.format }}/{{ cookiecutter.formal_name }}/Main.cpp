@@ -145,12 +145,32 @@ int Main(array<String^>^ args) {
         Py_ExitStatusException(status);
     }
 
-    // The unpacked form of the stdlib
+    // The unpacked form of the stdlib in the root of the app (Embedded CPython style)
     path = python_home;
     debug_log("- %S\n", wstr(path));
     status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
     if (PyStatus_Exception(status)) {
         crash_dialog("Unable to set unpacked form of stdlib path: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // The unpacked form of the stdlib in a Lib folder (Conda style)
+    path = python_home + "\\Lib";
+    debug_log("- %S\n", wstr(path));
+    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to set Lib form of stdlib path: " + gcnew String(status.err_msg));
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    // Standard library DLLs in a standalone folder (Conda style)
+    path = python_home + "\\DLLs";
+    debug_log("- %S\n", wstr(path));
+    status = PyWideStringList_Append(&config.module_search_paths, wstr(path));
+    if (PyStatus_Exception(status)) {
+        crash_dialog("Unable to add DLLs folder to stdlib path: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
         Py_ExitStatusException(status);
     }
