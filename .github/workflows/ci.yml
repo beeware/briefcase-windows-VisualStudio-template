@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -29,7 +32,9 @@ jobs:
     name: Verify min_os_version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: |
           target_windows_build=$(grep -oP 'target_windows_build = \K\d+' "{{ cookiecutter.format }}/briefcase.toml")
           min_os_version=$(grep -oP '"min_os_version": "\K\d+(?=")' "cookiecutter.json")
