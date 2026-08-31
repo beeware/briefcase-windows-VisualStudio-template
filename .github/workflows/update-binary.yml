@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -48,10 +51,12 @@ jobs:
         echo "BUILD_NUMBER=${BUILD_NUMBER}" | tee -a $GITHUB_ENV
 
     - name: Checkout Template
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Setup Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7.0.0
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
         allow-prereleases: true
@@ -62,18 +67,23 @@ jobs:
         python -m pip install git+https://github.com/beeware/briefcase.git
 
     - name: Generate VisualStudio Stub App
+      env:
+        MATRIX_CONFIG_ARCH: ${{ matrix.config.arch }}
+        PYTHON_TAG: ${{ env.PYTHON_TAG }}
+        BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
+        MATRIX_CONFIG_VSCODE_ARCH: ${{ matrix.config.vscode_arch }}
       run: |
         # Generate the stub app
         cd stub
         briefcase build windows visualstudio
 
-        echo "Build ${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }} console stub artefact"
-        mv "./build/console-stub/windows/visualstudio/${{ matrix.config.vscode_arch }}/Release/console-stub.exe" ./Stub.exe
-        7z a Console-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
+        echo "Build ${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER} console stub artefact"
+        mv "./build/console-stub/windows/visualstudio/${MATRIX_CONFIG_VSCODE_ARCH}/Release/console-stub.exe" ./Stub.exe
+        7z a Console-Stub-${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER}.zip Stub.exe
 
-        echo "Build ${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }} GUI stub artefact"
-        mv "./build/gui-stub/windows/visualstudio/${{ matrix.config.vscode_arch }}/Release/GUI Stub.exe" ./Stub.exe
-        7z a GUI-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip Stub.exe
+        echo "Build ${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER} GUI stub artefact"
+        mv "./build/gui-stub/windows/visualstudio/${MATRIX_CONFIG_VSCODE_ARCH}/Release/GUI Stub.exe" ./Stub.exe
+        7z a GUI-Stub-${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER}.zip Stub.exe
 
         echo "Stub binaries:"
         ls -1 *.zip
@@ -83,10 +93,13 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        MATRIX_CONFIG_ARCH: ${{ matrix.config.arch }}
+        PYTHON_TAG: ${{ env.PYTHON_TAG }}
+        BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
       run: |
         python -m pip install -U pip
         python -m pip install -U setuptools
         python -m pip install awscli
 
-        aws s3 cp stub/Console-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/Console-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip
-        aws s3 cp stub/GUI-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip s3://briefcase-support/python/${{ env.PYTHON_TAG }}/windows/GUI-Stub-${{ env.PYTHON_TAG }}-${{ matrix.config.arch }}-${{ env.BUILD_NUMBER }}.zip
+        aws s3 cp stub/Console-Stub-${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER}.zip s3://briefcase-support/python/${PYTHON_TAG}/windows/Console-Stub-${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER}.zip
+        aws s3 cp stub/GUI-Stub-${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER}.zip s3://briefcase-support/python/${PYTHON_TAG}/windows/GUI-Stub-${PYTHON_TAG}-${MATRIX_CONFIG_ARCH}-${BUILD_NUMBER}.zip
