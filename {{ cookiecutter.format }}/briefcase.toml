@@ -16,7 +16,7 @@ extras_path = "extras"
     "3.12": "support_revision = 10",
     "3.13": "support_revision = 15",
     "3.14": "support_revision = 7",
-    "3.15": "support_revision = 0rc2",
+    "3.15": "support_revision = '0rc2'",
 }.get(cookiecutter.python_version|py_tag, "") }}
 
 icon = "{{ cookiecutter.formal_name }}/icon.ico"
