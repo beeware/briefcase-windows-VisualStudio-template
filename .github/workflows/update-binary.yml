@@ -21,21 +21,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.11", "3.12", "3.13", "3.14" ]
+        python-version: [ "3.11", "3.12", "3.13", "3.14", "3.15" ]
         config:
-          - runner: windows-2022
+          - runner: windows-2025
             vscode_arch: x64
             arch: amd64
           - runner: windows-11-arm
             vscode_arch: ARM64
             arch: arm64
-        include:
-          # GitHub doesn't provide ARM64 binaries for Python 3.10
-          - python-version: "3.10"
-            config:
-              runner: windows-2022
-              vscode_arch: x64
-              arch: amd64
 
     runs-on: ${{ matrix.config.runner }}
     steps:
