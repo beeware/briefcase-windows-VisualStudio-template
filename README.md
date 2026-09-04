@@ -10,13 +10,13 @@ However, if you *do* want use this template directly...
 
 1. Install [cookiecutter](https://github.com/cookiecutter/cookiecutter). This is a tool used to bootstrap complex project templates:
 
-    ```text
+    ```console
     pip install cookiecutter
     ```
 
 2. Run `cookiecutter` on the template:
 
-    ```text
+    ```console
     cookiecutter https://github.com/beeware/briefcase-windows-VisualStudio-template
     ```
 
@@ -70,7 +70,7 @@ The executable in `x64/Release` will start your application.
 
 This project can now be compiled with [WiX](https://wixtoolset.org) to produce an MSI file. Open a command prompt, and change into the `My Project` directory. Then:
 
-```text
+```console
 C:\...>wix build -ext WixToolset.UI.wixext -ext WixToolset.Netfx.wixext -ext WixToolset.Util.wixext -arch x64 my-project.wxs -loc unicode.wxl -o "My Project.msi"
 ```
 
