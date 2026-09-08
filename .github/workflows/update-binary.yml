@@ -93,7 +93,7 @@ jobs:
     - name: Upload build artefacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
-        name: ${{ env.PYTHON_TAG }}-Stubs
+        name: ${{ env.PYTHON_TAG }}-${{ env.ARCH }}-Stubs
         path: stub/*.zip
 
     - name: Upload Release Asset to S3
