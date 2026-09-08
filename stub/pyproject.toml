@@ -12,11 +12,11 @@ template = ".."
 
 [tool.briefcase.app.gui-stub]
 formal_name = "GUI Stub"
-description = "A stub binary for GUI apps that can be integrated into the Windows app template"
+description = "A stub binary for Windows GUI apps"
 sources = ['src/gui_stub']
 
 [tool.briefcase.app.console-stub]
 formal_name = "Console Stub"
-description = "A stub binary for console apps that can be integrated into the Windows app template"
+description = "A stub binary for Windows console apps"
 sources = ['src/console_stub']
 console_app = true
