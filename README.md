@@ -35,7 +35,7 @@ However, if you *do* want use this template directly...
     In order to build the project, you will need to configure Visual Studio to include the following modules:
 
     * **.NET Desktop development** - default options
-    * **Deskop Development with C++** - default options, plus the "MSVC Build Tools v14.50".
+    * **Deskop Development with C++** - default options, plus the "MSVC Build Tools v14.50" and "C++/CLI support (MSVC v14.50)".
 
 If you've done this correctly, a project with a formal name of `My Project`, with an app name of `my-project` should have a directory structure that looks something like:
 
