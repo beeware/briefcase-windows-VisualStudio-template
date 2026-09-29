@@ -25,6 +25,7 @@ char *debug_mode;
 #define MAX_LOG_FILE_AGE_DAYS 7
 
 wchar_t* wstr(String^);
+bool is_python_command_line(array<String^>^ args);
 void setup_stdout(FileVersionInfo^);
 void crash_dialog(String^);
 String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback);
@@ -65,6 +66,11 @@ int Main(array<String^>^ args) {
 
     // Set up stdout/err handling
     setup_stdout(version_info);
+
+    // If we were invoked like python.exe (e.g., via sys.executable by
+    // subprocess or multiprocessing), run the command line instead of the app.
+    bool python_mode = is_python_command_line(args);
+    debug_log("Python command line mode: %d\n", python_mode);
 
     // Preconfigure the Python interpreter;
     // This ensures the interpreter is in Isolated mode,
@@ -120,9 +126,27 @@ int Main(array<String^>^ args) {
         app_module_name = version_info->InternalName;
         app_module_str = wstr(app_module_name);
     }
-    status = PyConfig_SetString(&config, &config.run_module, app_module_str);
+    if (python_mode) {
+        // Let CPython parse the command line options, as python.exe does.
+        config.parse_argv = 1;
+    } else {
+        status = PyConfig_SetString(&config, &config.run_module, app_module_str);
+        if (PyStatus_Exception(status)) {
+            crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
+            PyConfig_Clear(&config);
+            Py_ExitStatusException(status);
+        }
+    }
+
+    debug_log("Configure argc/argv...\n");
+    wchar_t** argv = new wchar_t* [args->Length + 1];
+    argv[0] = wstr(Application::ExecutablePath);
+    for (int i = 0; i < args->Length; i++) {
+        argv[i + 1] = wstr(args[i]);
+    }
+    status = PyConfig_SetArgv(&config, args->Length + 1, argv);
     if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to set app module name: " + gcnew String(status.err_msg));
+        crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
         PyConfig_Clear(&config);
         Py_ExitStatusException(status);
     }
@@ -187,19 +211,6 @@ int Main(array<String^>^ args) {
         Py_ExitStatusException(status);
     }
 
-    debug_log("Configure argc/argv...\n");
-    wchar_t** argv = new wchar_t* [args->Length + 1];
-    argv[0] = wstr(Application::ExecutablePath);
-    for (int i = 0; i < args->Length; i++) {
-        argv[i + 1] = wstr(args[i]);
-    }
-    status = PyConfig_SetArgv(&config, args->Length + 1, argv);
-    if (PyStatus_Exception(status)) {
-        crash_dialog("Unable to configure argc/argv: " + gcnew String(status.err_msg));
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-    }
-
     debug_log("Initializing Python runtime...\n");
     status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
@@ -248,89 +259,97 @@ int Main(array<String^>^ args) {
             exit(-15);
         }
 
-        // Start the app module.
-        //
-        // From here to Py_ObjectCall(runmodule...) is effectively
-        // a copy of Py_RunMain() (and, more  specifically, the
-        // pymain_run_module() method); we need to re-implement it
-        // because we need to be able to inspect the error state of
-        // the interpreter, not just the return code of the module.
-        debug_log("Running app module: %S\n", app_module_str);
-
-        module = PyImport_ImportModule("runpy");
-        if (module == NULL) {
-            crash_dialog("Could not import runpy module");
-            exit(-2);
+        if (python_mode) {
+            debug_log("Running Python command line\n");
+            fflush(stdout);
+            fflush(stderr);
+            return Py_RunMain();
         }
+        else {
+            // Start the app module.
+            //
+            // From here to Py_ObjectCall(runmodule...) is effectively
+            // a copy of Py_RunMain() (and, more  specifically, the
+            // pymain_run_module() method); we need to re-implement it
+            // because we need to be able to inspect the error state of
+            // the interpreter, not just the return code of the module.
+            debug_log("Running app module: %S\n", app_module_str);
 
-        module_attr = PyObject_GetAttrString(module, "_run_module_as_main");
-        if (module_attr == NULL) {
-            crash_dialog("Could not access runpy._run_module_as_main");
-            exit(-3);
-        }
-
-        app_module = PyUnicode_FromWideChar(app_module_str, wcslen(app_module_str));
-        if (app_module == NULL) {
-            crash_dialog("Could not convert module name to unicode");
-            exit(-3);
-        }
-
-        method_args = Py_BuildValue("(Oi)", app_module, 0);
-        if (method_args == NULL) {
-            crash_dialog("Could not create arguments for runpy._run_module_as_main");
-            exit(-4);
-        }
-
-        // Print a separator to differentiate Python startup logs from app logs,
-        // then flush stdout/stderr to ensure all startup logs have been output.
-        debug_log("---------------------------------------------------------------------------\n");
-        fflush(stdout);
-        fflush(stderr);
-
-        // Invoke the app module
-        result = PyObject_Call(module_attr, method_args, NULL);
-
-        if (result == NULL) {
-            // Retrieve the current error state of the interpreter.
-            PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
-            PyErr_NormalizeException(&exc_type, &exc_value, &exc_traceback);
-
-            if (exc_traceback == NULL) {
-                crash_dialog("Could not retrieve traceback");
-                exit(-5);
+            module = PyImport_ImportModule("runpy");
+            if (module == NULL) {
+                crash_dialog("Could not import runpy module");
+                exit(-2);
             }
 
-            traceback_str = nullptr;
-            if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
-                systemExit_code = PyObject_GetAttrString(exc_value, "code");
-                if (systemExit_code == NULL) {
-                    traceback_str = "Could not determine exit code";
-                    ret = -10;
-                } else if (systemExit_code == Py_None) {
-                    // SystemExit with a code of None; documented as a return
-                    // code of 0.
-                    ret = 0;
-                } else if (PyLong_Check(systemExit_code)) {
-                    // SystemExit with error code
-                    ret = (int) PyLong_AsLong(systemExit_code);
-                } else {
-                    // Any other SystemExit value - convert to a string, and use
-                    // the string as the traceback, and use the documented
-                    // SystemExit return value of 1.
-                    ret = 1;
-                    traceback_str = PyObject_CppString(systemExit_code);
+            module_attr = PyObject_GetAttrString(module, "_run_module_as_main");
+            if (module_attr == NULL) {
+                crash_dialog("Could not access runpy._run_module_as_main");
+                exit(-3);
+            }
+
+            app_module = PyUnicode_FromWideChar(app_module_str, wcslen(app_module_str));
+            if (app_module == NULL) {
+                crash_dialog("Could not convert module name to unicode");
+                exit(-3);
+            }
+
+            method_args = Py_BuildValue("(Oi)", app_module, 0);
+            if (method_args == NULL) {
+                crash_dialog("Could not create arguments for runpy._run_module_as_main");
+                exit(-4);
+            }
+
+            // Print a separator to differentiate Python startup logs from app logs,
+            // then flush stdout/stderr to ensure all startup logs have been output.
+            debug_log("---------------------------------------------------------------------------\n");
+            fflush(stdout);
+            fflush(stderr);
+
+            // Invoke the app module
+            result = PyObject_Call(module_attr, method_args, NULL);
+
+            if (result == NULL) {
+                // Retrieve the current error state of the interpreter.
+                PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
+                PyErr_NormalizeException(&exc_type, &exc_value, &exc_traceback);
+
+                if (exc_traceback == NULL) {
+                    crash_dialog("Could not retrieve traceback");
+                    exit(-5);
                 }
-            } else {
-                // Non-SystemExit; likely an uncaught exception
-                info_log("---------------------------------------------------------------------------\n");
-                info_log("Application quit abnormally!\n");
-                ret = -6;
-                traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
-            }
 
-            if (traceback_str != nullptr) {
-                // Display stack trace in the crash dialog.
-                crash_dialog(traceback_str);
+                traceback_str = nullptr;
+                if (PyErr_GivenExceptionMatches(exc_value, PyExc_SystemExit)) {
+                    systemExit_code = PyObject_GetAttrString(exc_value, "code");
+                    if (systemExit_code == NULL) {
+                        traceback_str = "Could not determine exit code";
+                        ret = -10;
+                    } else if (systemExit_code == Py_None) {
+                        // SystemExit with a code of None; documented as a return
+                        // code of 0.
+                        ret = 0;
+                    } else if (PyLong_Check(systemExit_code)) {
+                        // SystemExit with error code
+                        ret = (int) PyLong_AsLong(systemExit_code);
+                    } else {
+                        // Any other SystemExit value - convert to a string, and use
+                        // the string as the traceback, and use the documented
+                        // SystemExit return value of 1.
+                        ret = 1;
+                        traceback_str = PyObject_CppString(systemExit_code);
+                    }
+                } else {
+                    // Non-SystemExit; likely an uncaught exception
+                    info_log("---------------------------------------------------------------------------\n");
+                    info_log("Application quit abnormally!\n");
+                    ret = -6;
+                    traceback_str = format_traceback(exc_type, exc_value, exc_traceback);
+                }
+
+                if (traceback_str != nullptr) {
+                    // Display stack trace in the crash dialog.
+                    crash_dialog(traceback_str);
+                }
             }
         }
     }
@@ -347,6 +366,40 @@ wchar_t *wstr(String^ str)
 {
     pin_ptr<const wchar_t> pinned = PtrToStringChars(str);
     return (wchar_t*)pinned;
+}
+
+/**
+ * Return true if the arguments look like a python.exe invocation that runs
+ * a command or module, e.g. `-B -I -c "..." --multiprocessing-fork`.
+ * Only the leading interpreter flags are accepted, so that the app's own
+ * options (such as `-b <arg>`) do not enable Python mode.
+ */
+bool is_python_command_line(array<String^>^ args) {
+    String^ flags = "BbdEIOPqRSsuv";
+
+    for (int i = 0; i < args->Length; i++) {
+        String^ arg = args[i];
+        if (arg->Length < 2 || arg[0] != L'-') {
+            return false;
+        }
+        for (int j = 1; j < arg->Length; j++) {
+            wchar_t ch = arg[j];
+            if (ch == L'c' || ch == L'm') {
+                // The value is either attached (-cCODE) or the next argument.
+                return j + 1 < arg->Length || i + 1 < args->Length;
+            }
+            if (ch == L'X' || ch == L'W') {
+                if (j + 1 == arg->Length) {
+                    i++;
+                }
+                break;
+            }
+            if (flags->IndexOf(ch) < 0) {
+                return false;
+            }
+        }
+    }
+    return false;
 }
 
 {% if cookiecutter.console_app %}
