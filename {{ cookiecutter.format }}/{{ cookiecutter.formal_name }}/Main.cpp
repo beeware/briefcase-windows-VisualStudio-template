@@ -14,6 +14,7 @@ using namespace System::Diagnostics;
 using namespace System::IO;
 using namespace System::Windows::Forms;
 using namespace System::Globalization;  // for timestamp formatting
+using namespace System::Text::RegularExpressions;
 
 
 // A global indicator of the debug level
@@ -25,7 +26,7 @@ char *debug_mode;
 #define MAX_LOG_FILE_AGE_DAYS 7
 
 wchar_t* wstr(String^);
-bool is_python_command_line(array<String^>^ args);
+bool is_multiprocessing_command_line(array<String^>^ args);
 void setup_stdout(FileVersionInfo^);
 void crash_dialog(String^);
 String^ format_traceback(PyObject *type, PyObject *value, PyObject *traceback);
@@ -67,10 +68,10 @@ int Main(array<String^>^ args) {
     // Set up stdout/err handling
     setup_stdout(version_info);
 
-    // If we were invoked like python.exe (e.g., via sys.executable by
-    // subprocess or multiprocessing), run the command line instead of the app.
-    bool python_mode = is_python_command_line(args);
-    debug_log("Python command line mode: %d\n", python_mode);
+    // If we were started as a multiprocessing spawn worker (via sys.executable),
+    // run the worker command instead of the app.
+    bool python_mode = is_multiprocessing_command_line(args);
+    debug_log("Multiprocessing worker mode: %d\n", python_mode);
 
     // Preconfigure the Python interpreter;
     // This ensures the interpreter is in Isolated mode,
@@ -369,37 +370,42 @@ wchar_t *wstr(String^ str)
 }
 
 /**
- * Return true if the arguments look like a python.exe invocation that runs
- * a command or module, e.g. `-B -I -c "..." --multiprocessing-fork`.
- * Only the leading interpreter flags are accepted, so that the app's own
- * options (such as `-b <arg>`) do not enable Python mode.
+ * Return true if the arguments are exactly the command line that
+ * multiprocessing uses to start a spawn worker on Windows:
+ *
+ *   <flags> -c "from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=N, pipe_handle=N)" --multiprocessing-fork
+ *
+ * This is an allow-list (similar to PyInstaller's pyi_rth_multiprocessing),
+ * so the app binary does not act as a general Python interpreter.
+ * The flags come from subprocess._args_from_interpreter_flags(). -W and -X
+ * are rejected: the stub never sets warning or -X options, and a -W category
+ * can import an arbitrary module.
  */
-bool is_python_command_line(array<String^>^ args) {
-    String^ flags = "BbdEIOPqRSsuv";
+bool is_multiprocessing_command_line(array<String^>^ args) {
+    String^ flags = "BbdEIOPqSsv";
+    int i = 0;
 
-    for (int i = 0; i < args->Length; i++) {
+    for (; i < args->Length && args[i] != "-c"; i++) {
         String^ arg = args[i];
         if (arg->Length < 2 || arg[0] != L'-') {
             return false;
         }
         for (int j = 1; j < arg->Length; j++) {
-            wchar_t ch = arg[j];
-            if (ch == L'c' || ch == L'm') {
-                // The value is either attached (-cCODE) or the next argument.
-                return j + 1 < arg->Length || i + 1 < args->Length;
-            }
-            if (ch == L'X' || ch == L'W') {
-                if (j + 1 == arg->Length) {
-                    i++;
-                }
-                break;
-            }
-            if (flags->IndexOf(ch) < 0) {
+            if (flags->IndexOf(arg[j]) < 0) {
                 return false;
             }
         }
     }
-    return false;
+
+    // -c, the command, and --multiprocessing-fork must be the last three.
+    if (i + 3 != args->Length || args[i + 2] != "--multiprocessing-fork") {
+        return false;
+    }
+    return Regex::IsMatch(
+        args[i + 1],
+        "^from multiprocessing\\.spawn import spawn_main; "
+        "spawn_main\\(parent_pid=[0-9]+, pipe_handle=[0-9]+\\)\\z"
+    );
 }
 
 {% if cookiecutter.console_app %}
