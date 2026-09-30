@@ -248,6 +248,22 @@ int Main(array<String^>^ args) {
             exit(-15);
         }
 
+{% if cookiecutter.allow_subprocesses %}
+        // Point sys.executable at python*.exe so that the app can start Python subprocesses.
+        {% if cookiecutter.console_app %}
+        path = python_home + "\\python.exe";
+        {% else %}
+        path = python_home + "\\pythonw.exe";
+        {% endif -%}
+        debug_log("Setting sys.executable: %S\n", wstr(path));
+        module_attr = PyUnicode_FromWideChar(wstr(path), path->Length);
+        if (module_attr == NULL || PySys_SetObject("executable", module_attr) < 0) {
+            crash_dialog("Could not set sys.executable");
+            exit(-16);
+        }
+        Py_DECREF(module_attr);
+{% endif %}
+
         // Start the app module.
         //
         // From here to Py_ObjectCall(runmodule...) is effectively
