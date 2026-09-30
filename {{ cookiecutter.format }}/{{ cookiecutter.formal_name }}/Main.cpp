@@ -257,7 +257,11 @@ int Main(array<String^>^ args) {
         {% endif -%}
         debug_log("Setting sys.executable: %S\n", wstr(path));
         module_attr = PyUnicode_FromWideChar(wstr(path), path->Length);
-        if (module_attr == NULL || PySys_SetObject("executable", module_attr) < 0) {
+        // _base_executable must match too; otherwise multiprocessing assumes
+        // a venv and launches this stub instead.
+        if (module_attr == NULL
+            || PySys_SetObject("executable", module_attr) < 0
+            || PySys_SetObject("_base_executable", module_attr) < 0) {
             crash_dialog("Could not set sys.executable");
             exit(-16);
         }
