@@ -248,6 +248,30 @@ int Main(array<String^>^ args) {
             exit(-15);
         }
 
+        // Point sys.executable at python*.exe so that the app can start Python subprocesses.
+        {% if cookiecutter.console_app %}
+        path = python_home + "\\python.exe";
+        {% else %}
+        path = python_home + "\\pythonw.exe";
+        {% endif -%}
+        if (File::Exists(path)) {
+            debug_log("Setting sys.executable: %S\n", wstr(path));
+            module_attr = PyUnicode_FromWideChar(wstr(path), path->Length);
+        } else {
+            debug_log("Clearing sys.executable\n");
+            module_attr = PyUnicode_FromString("");
+        }
+
+        // _base_executable must match too; otherwise multiprocessing assumes
+        // a venv and launches this stub instead.
+        if (module_attr == NULL
+            || PySys_SetObject("executable", module_attr) < 0
+            || PySys_SetObject("_base_executable", module_attr) < 0) {
+            crash_dialog("Could not set sys.executable");
+            exit(-16);
+        }
+        Py_DECREF(module_attr);
+
         // Start the app module.
         //
         // From here to Py_ObjectCall(runmodule...) is effectively
