@@ -40,5 +40,7 @@ icon = "{{ cookiecutter.formal_name }}/icon.ico"
 document_type_icon.{{ document_type_id }} = "{{ cookiecutter.app_name }}-{{ document_type_id }}.ico"
 {% endfor %}
 cleanup_paths = [
+    {% if not cookiecutter.allow_subprocesses -%}
     "{{ cookiecutter.vscode_platform }}/Release/python*.exe",
+    {% endif -%}
 ]
