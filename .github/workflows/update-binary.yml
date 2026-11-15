@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.11", "3.12", "3.13", "3.14", "3.15" ]
+        python-version: [ "3.11", "3.12", "3.13", "3.14", "3.15", "3.16" ]
         config:
           - runner: windows-2025
             vscode_arch: x64
@@ -137,7 +137,7 @@ jobs:
       run: |
         gh release create "${BUILD_NUMBER}" \
           --title "${BUILD_NUMBER}" \
-          --notes "$(printf 'Build %s of the Briefcase Windows stub binary.\n\nIncludes support for Python 3.11-3.15.\n' "${BUILD_NUMBER}")" \
+          --notes "$(printf 'Build %s of the Briefcase Windows stub binary.\n\nIncludes support for Python 3.11-3.16.\n' "${BUILD_NUMBER}")" \
           --draft \
           --verify-tag \
           dist/*
